@@ -23,5 +23,8 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 /plan/
-docs/plans/
-
+docs/plans/*
+# Tooling output (browser automation logs, throwaway db checks)
+.playwright-mcp/
+.tmp-*
+.playwright-mcp/*
