@@ -14,7 +14,7 @@ export default defineConfig({
 				inspector: {
 					toggleKeyCombo: 'alt-x',
 					showToggleButton: 'active',
-					toggleButtonPos: 'bottom-right'
+					toggleButtonPos: 'bottom-left'
 				}
 			},
 			compilerOptions: {
