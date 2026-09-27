@@ -28,6 +28,8 @@ export async function getSettings(userId: string): Promise<SettingsDto> {
 		aiKeySet: Boolean(aiKey),
 		ttsEngine: (row?.ttsEngine as TtsEngine) || (envOrDefault('TTS_ENGINE', 'kitten') as TtsEngine),
 		ttsVoice: row?.ttsVoice || 'expr-voice-2-f',
+		ttsSpeed: row?.ttsSpeed ?? 1,
+		ttsRamp: row?.ttsRamp ?? false,
 		syncWindowDays: row?.syncWindowDays ?? 7
 	};
 }
@@ -49,6 +51,8 @@ export async function saveSettings(userId: string, input: SettingsDto): Promise<
 			aiModel: input.aiModel,
 			ttsEngine: input.ttsEngine,
 			ttsVoice: input.ttsVoice,
+			ttsSpeed: input.ttsSpeed,
+			ttsRamp: input.ttsRamp,
 			syncWindowDays: input.syncWindowDays,
 			updatedAt: new Date()
 		})
@@ -60,9 +64,25 @@ export async function saveSettings(userId: string, input: SettingsDto): Promise<
 				aiModel: input.aiModel,
 				ttsEngine: input.ttsEngine,
 				ttsVoice: input.ttsVoice,
+				ttsSpeed: input.ttsSpeed,
+				ttsRamp: input.ttsRamp,
 				syncWindowDays: input.syncWindowDays,
 				updatedAt: new Date()
 			}
+		});
+}
+
+/**
+ * Persist only the voice speed/ramp (the player's speed menu). Inserts a row
+ * when the user has never saved settings, so a fresh install can still ramp.
+ */
+export async function saveVoiceSpeed(userId: string, speed: number, ramp: boolean): Promise<void> {
+	await db
+		.insert(settings)
+		.values({ userId, ttsSpeed: speed, ttsRamp: ramp })
+		.onConflictDoUpdate({
+			target: settings.userId,
+			set: { ttsSpeed: speed, ttsRamp: ramp, updatedAt: new Date() }
 		});
 }
 

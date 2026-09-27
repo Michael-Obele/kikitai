@@ -60,6 +60,10 @@ export const settingsSchema = v.object({
 	aiKeySet: v.boolean(),
 	ttsEngine: ttsEngineSchema,
 	ttsVoice: v.string(),
+	/** Speed cap (multiplier) — steps live in SPEED_STEPS. */
+	ttsSpeed: v.pipe(v.number(), v.minValue(0.5), v.maxValue(3)),
+	/** Auto speed ramp: +0.1× every 2 min of playback up to ttsSpeed. */
+	ttsRamp: v.boolean(),
 	syncWindowDays: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(30))
 });
 export type SettingsDto = v.InferOutput<typeof settingsSchema>;

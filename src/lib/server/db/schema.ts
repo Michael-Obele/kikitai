@@ -4,6 +4,7 @@ import {
 	index,
 	integer,
 	pgTable,
+	real,
 	text,
 	timestamp,
 	uniqueIndex
@@ -95,6 +96,10 @@ export const settings = pgTable('settings', {
 	aiModel: text('ai_model').notNull().default(''),
 	ttsEngine: text('tts_engine').notNull().default('kitten'),
 	ttsVoice: text('tts_voice').notNull().default('expr-voice-2-f'),
+	/** Playback speed multiplier (0.5–3). See SPEED_STEPS in $lib/tts. */
+	ttsSpeed: real('tts_speed').notNull().default(1),
+	/** Auto ramp: +0.1× every 2 min of playback, up to `ttsSpeed`. */
+	ttsRamp: boolean('tts_ramp').notNull().default(false),
 	syncWindowDays: integer('sync_window_days').notNull().default(7),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
