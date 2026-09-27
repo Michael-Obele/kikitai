@@ -103,6 +103,7 @@
 	<div class="divide-y">
 		{#each items as item, i (item.subject)}
 			{@const active = i === index}
+			{@const rowParts = item.line.split(/(?<=\.)\s+/)}
 			<div
 				class={cn(
 					'relative px-4 py-3 motion-safe:transition-colors motion-safe:duration-500',
@@ -137,7 +138,7 @@
 				</p>
 
 				<p class="mt-2 text-sm leading-relaxed">
-					{#each parts as part, p (part)}
+					{#each rowParts as part, p (part)}
 						<span
 							class={cn(
 								'motion-safe:transition-colors motion-safe:duration-300',
@@ -146,7 +147,7 @@
 									: active
 										? 'text-foreground'
 										: 'text-muted-foreground'
-							)}>{part}{p < parts.length - 1 ? ' ' : ''}</span
+							)}>{part}{p < rowParts.length - 1 ? ' ' : ''}</span
 						>
 					{/each}
 				</p>

@@ -83,7 +83,12 @@
 					class="grid motion-safe:transition-[grid-template-rows] motion-safe:duration-300 motion-safe:ease-out"
 					style="grid-template-rows: {open === i ? '1fr' : '0fr'}"
 				>
-					<div class="overflow-hidden">
+					<div
+						class={cn(
+							'overflow-hidden motion-safe:transition-[visibility] motion-safe:duration-300',
+							open === i ? 'visible' : 'invisible'
+						)}
+					>
 						<p class="max-w-xl pb-5 text-sm leading-relaxed text-muted-foreground">{faq.a}</p>
 					</div>
 				</div>

@@ -58,7 +58,13 @@
 	const autoplaying = $derived(picked === null && !prefersReducedMotion.current);
 
 	$effect(() => {
-		if (prefersReducedMotion.current || picked !== null) return;
+		if (prefersReducedMotion.current || picked !== null) {
+			// Freeze any in-flight tween: the loop below only checks `alive` after
+			// its await, so autoplay would otherwise keep stepping for up to 20.8s
+			// after reduced motion is switched on mid-cycle.
+			untrack(() => auto.set(0, { duration: 0 }));
+			return;
+		}
 
 		return untrack(() => {
 			let alive = true;

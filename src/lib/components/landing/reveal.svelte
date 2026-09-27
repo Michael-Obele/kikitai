@@ -68,7 +68,7 @@
 	bind:this={el}
 	style="transition-delay: {delay}ms"
 	class={cn(
-		'motion-safe:transition-[opacity,transform] motion-safe:duration-700 motion-safe:ease-out',
+		'landing-reveal motion-safe:transition-[opacity,transform] motion-safe:duration-700 motion-safe:ease-out',
 		visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
 		className
 	)}
