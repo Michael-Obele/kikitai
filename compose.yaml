@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: local
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -d local']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Must match the URL you open the app on — Better Auth builds the Google
+      # callback from it.
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL:-postgres://root:mysecretpassword@db:5432/local}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?set AUTH_TOKEN_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_KEY: ${AI_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      TTS_ENGINE: ${TTS_ENGINE:-kitten}
+      GOOGLE_TTS_KEY: ${GOOGLE_TTS_KEY:-}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_GROUP_ID: ${MINIMAX_GROUP_ID:-}
+      PUBLIC_TTS_CDN: ${PUBLIC_TTS_CDN:-https://esm.sh}
+
+volumes:
+  pgdata:
