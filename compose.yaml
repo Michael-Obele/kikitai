@@ -40,7 +40,7 @@ services:
       GOOGLE_TTS_KEY: ${GOOGLE_TTS_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       MINIMAX_GROUP_ID: ${MINIMAX_GROUP_ID:-}
-      PUBLIC_TTS_CDN: ${PUBLIC_TTS_CDN:-https://esm.sh}
+      PUBLIC_TTS_CDN: ${PUBLIC_TTS_CDN:-https://cdn.jsdelivr.net/npm}
 
 volumes:
   pgdata:
