@@ -13,24 +13,63 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import MessageCard from '$lib/components/inbox/message-card.svelte';
 	import MessageView from '$lib/components/inbox/message-view.svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import {
 		connectGmail,
 		getAccountStatus,
+		getDigest,
 		getInbox,
+		getMessage,
 		getSettings,
 		organizeMail,
 		syncMail
 	} from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
-	import { CATEGORIES, CATEGORY_LABELS, type InboxFilter } from '$lib/types/mail';
+	import { CATEGORIES, CATEGORY_LABELS, type InboxFilter, type InboxItem } from '$lib/types/mail';
 	import type { EngineId } from '$lib/tts';
 
 	let search = $state('');
 	let category = $state<string>('all');
 	let priority = $state<'all' | 'high' | 'unorganized'>('all');
 	let busy = $state<null | 'connect' | 'sync' | 'organize'>(null);
-	let open = $state(false);
-	let selectedId = $state<string | null>(null);
+	/** Snapshot of the open message — a list refetch can never blank the dialog. */
+	let selectedItem = $state<InboxItem | null>(null);
+
+	/** `?message=<id>` is the source of truth: survives refresh, Back and list refetches. */
+	const messageParam = $derived(page.url.searchParams.get('message'));
+	const open = $derived(Boolean(messageParam));
+
+	$effect(() => {
+		const id = messageParam;
+		if (id && selectedItem?.id !== id) void selectById(id);
+	});
+
+	function selectItem(item: InboxItem) {
+		selectedItem = item;
+		if (messageParam !== item.id) {
+			void goto(`?message=${item.id}`, { keepFocus: true, noScroll: true });
+		}
+	}
+
+	async function selectById(id: string) {
+		try {
+			selectedItem = await getMessage(id);
+		} catch (error) {
+			toast.error(errorMessage(error));
+			if (messageParam) void goto(page.url.pathname, { keepFocus: true, noScroll: true });
+		}
+	}
+
+	/** Esc · ✕ · Close — the browser Back button clears the param by itself. */
+	function closeMessage() {
+		if (messageParam) void goto(page.url.pathname, { keepFocus: true, noScroll: true });
+	}
+
+	function openFullPage() {
+		if (!selectedItem) return;
+		void goto(`/inbox/${selectedItem.id}`);
+	}
 
 	const filter = $derived<InboxFilter>({
 		category: category as InboxFilter['category'],
@@ -46,14 +85,14 @@
 		busy = action;
 		try {
 			if (action === 'connect') {
-				const result = await connectGmail();
+				const result = await connectGmail().updates(getInbox);
 				toast.success(`Connected ${result.address}. Pulling mail…`);
-				const sync = await syncMail();
+				const sync = await syncMail().updates(getInbox, getDigest);
 				reportSync(sync);
 			} else if (action === 'sync') {
-				reportSync(await syncMail());
+				reportSync(await syncMail().updates(getInbox, getDigest));
 			} else {
-				const result = await organizeMail();
+				const result = await organizeMail().updates(getInbox, getDigest);
 				if (result.organized === 0 && result.failed === 0) {
 					toast.info('Everything is already organized.');
 				} else {
@@ -187,8 +226,6 @@
 					{/each}
 				</div>
 			{:then items}
-				{@const selected = items.find((entry) => entry.id === selectedId) ?? null}
-
 				{#if items.length === 0}
 					<div class="grid flex-1 place-items-center p-10 text-center">
 						<div class="max-w-sm">
@@ -208,24 +245,27 @@
 						{#each items as item (item.id)}
 							<MessageCard
 								{item}
-								selected={selectedId === item.id}
-								onclick={() => {
-									selectedId = item.id;
-									open = true;
-								}}
+								selected={selectedItem?.id === item.id}
+								onclick={() => selectItem(item)}
 							/>
 						{/each}
 					</div>
-
-					{#await settings then cfg}
-						<MessageView
-							bind:open
-							item={selected}
-							engine={cfg.ttsEngine as EngineId}
-							voice={cfg.ttsVoice}
-						/>
-					{/await}
 				{/if}
+
+				<!-- Rendered outside the inbox {#await} so a refetch never unmounts it. -->
+				{#await settings then cfg}
+					<MessageView
+						{open}
+						item={selectedItem}
+						engine={cfg.ttsEngine as EngineId}
+						voice={cfg.ttsVoice}
+						speed={cfg.ttsSpeed}
+						ramp={cfg.ttsRamp}
+						ondismiss={closeMessage}
+						onfullpage={openFullPage}
+						onsaved={(fresh) => (selectedItem = fresh)}
+					/>
+				{/await}
 			{:catch error}
 				<p class="p-6 text-sm text-destructive">{errorMessage(error)}</p>
 			{/await}

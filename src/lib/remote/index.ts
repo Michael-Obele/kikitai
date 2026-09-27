@@ -7,8 +7,9 @@ export {
 	getMessage,
 	getDigest,
 	getAccountStatus,
-	markDigested
+	markDigested,
+	loadThreadSummary
 } from './mail.remote';
-export { organizeMail, regenerateSummary } from './ai.remote';
+export { organizeMail, regenerateSummary, loadDetails, loadListenScript } from './ai.remote';
 export { getSettings, saveSettings, saveVoiceSpeed } from './settings.remote';
 export { synthesize } from './audio.remote';

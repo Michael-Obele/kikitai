@@ -1,14 +1,27 @@
 import { error } from '@sveltejs/kit';
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { eq } from 'drizzle-orm';
 import * as v from 'valibot';
 import { requireUser } from '$lib/server/session';
 import { db } from '$lib/server/db';
 import { mailAccount, message } from '$lib/server/db/schema';
-import { organizeBatch } from '$lib/server/ai';
+import { detailsFor, listenScriptFor, organizeBatch } from '$lib/server/ai';
 import { organizePending } from '$lib/server/organize';
 import { getAiConfig } from '$lib/server/settings';
-import { getInbox, getDigest } from './mail.remote';
+import type { MessageDetails } from '$lib/types/mail';
+import { getInbox, getDigest, getMessage } from './mail.remote';
+
+/** The caller's own message — 404 otherwise (IDOR guard, same rule everywhere). */
+async function ownedMessage(userId: string, id: string) {
+	const accountIds = await db
+		.select({ id: mailAccount.id })
+		.from(mailAccount)
+		.where(eq(mailAccount.userId, userId))
+		.then((rows) => rows.map((r) => r.id));
+	const [row] = await db.select().from(message).where(eq(message.id, id));
+	if (!row || !accountIds.includes(row.accountId)) error(404, 'Message not found');
+	return row;
+}
 
 /** Organize every message that has not been organized yet. */
 export const organizeMail = command(async () => {
@@ -27,8 +40,8 @@ export const organizeMail = command(async () => {
 		failed += result.failed;
 	}
 
-	void getInbox({}).refresh();
-	void getDigest().refresh();
+	await requested(getInbox, 10).refreshAll();
+	await requested(getDigest, 10).refreshAll();
 	return { organized, failed };
 });
 
@@ -38,14 +51,7 @@ export const regenerateSummary = command(v.string(), async (id: string) => {
 	const aiConfig = await getAiConfig(user.id);
 	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
 
-	const accountIds = await db
-		.select({ id: mailAccount.id })
-		.from(mailAccount)
-		.where(eq(mailAccount.userId, user.id))
-		.then((rows) => rows.map((r) => r.id));
-
-	const [target] = await db.select().from(message).where(eq(message.id, id));
-	if (!target || !accountIds.includes(target.accountId)) error(404, 'Message not found');
+	const target = await ownedMessage(user.id, id);
 
 	const result = await organizeBatch(aiConfig, [
 		{
@@ -65,12 +71,64 @@ export const regenerateSummary = command(v.string(), async (id: string) => {
 			summary: classification.summary,
 			priority: classification.priority,
 			actionItems: classification.actionItems,
+			facts: classification.facts,
 			organizedAt: new Date(),
 			organizeError: null
 		})
 		.where(eq(message.id, target.id));
 
-	void getInbox({}).refresh();
-	void getDigest().refresh();
+	void getMessage(id).refresh();
+	await requested(getInbox, 10).refreshAll();
+	await requested(getDigest, 10).refreshAll();
 	return { id: target.id };
+});
+
+/** Bullet details for one message — generated on first open, then served from the row. */
+export const loadDetails = command(v.string(), async (id: string) => {
+	const { user } = await requireUser();
+	const aiConfig = await getAiConfig(user.id);
+	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+
+	const target = await ownedMessage(user.id, id);
+	if (target.details) {
+		return { id, details: JSON.parse(target.details) as MessageDetails, cached: true };
+	}
+
+	const details = await detailsFor(aiConfig, {
+		gmailId: target.gmailId,
+		subject: target.subject,
+		from: target.fromEmail,
+		body: target.bodyText || target.subject
+	});
+	await db
+		.update(message)
+		.set({ details: JSON.stringify(details), detailsAt: new Date() })
+		.where(eq(message.id, target.id));
+
+	void getMessage(id).refresh();
+	return { id, details, cached: false };
+});
+
+/** Spoken rewrite of a long body — generated on first play, then served from the row. */
+export const loadListenScript = command(v.string(), async (id: string) => {
+	const { user } = await requireUser();
+	const aiConfig = await getAiConfig(user.id);
+	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+
+	const target = await ownedMessage(user.id, id);
+	if (target.spokenText) return { id, spokenText: target.spokenText, cached: true };
+
+	const spokenText = await listenScriptFor(aiConfig, {
+		gmailId: target.gmailId,
+		subject: target.subject,
+		from: target.fromEmail,
+		body: target.bodyText || target.subject
+	});
+	await db
+		.update(message)
+		.set({ spokenText, spokenAt: new Date() })
+		.where(eq(message.id, target.id));
+
+	void getMessage(id).refresh();
+	return { id, spokenText, cached: false };
 });

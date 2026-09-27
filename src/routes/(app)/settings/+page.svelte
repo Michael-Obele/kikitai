@@ -5,9 +5,10 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Switch } from '$lib/components/ui/switch';
 	import Player from '$lib/components/player/player.svelte';
-	import { getAccountStatus, saveSettings } from '$lib/remote';
-	import { ENGINES, type EngineId } from '$lib/tts';
+	import { getAccountStatus, saveSettings, saveVoiceSpeed } from '$lib/remote';
+	import { ENGINES, SPEED_STEPS, type EngineId } from '$lib/tts';
 
 	let { data } = $props();
 
@@ -15,6 +16,10 @@
 	let engine = $state<EngineId>(data.settings.ttsEngine as EngineId);
 	// svelte-ignore state_referenced_locally
 	let voice = $state(data.settings.ttsVoice);
+	// svelte-ignore state_referenced_locally
+	let speed = $state(data.settings.ttsSpeed ?? 1);
+	// svelte-ignore state_referenced_locally
+	let rampOn = $state(data.settings.ttsRamp ?? false);
 	// svelte-ignore state_referenced_locally
 	let aiBaseUrl = $state(data.settings.aiBaseUrl);
 	// svelte-ignore state_referenced_locally
@@ -31,6 +36,17 @@
 		const next = (event.currentTarget as HTMLSelectElement).value as EngineId;
 		engine = next;
 		voice = ENGINES[next].defaultVoice;
+	}
+
+	/** Speed/ramp apply instantly (menu-style toggles, not form inputs). */
+	function speedChanged(event: Event) {
+		speed = Number((event.currentTarget as HTMLSelectElement).value);
+		void saveVoiceSpeed({ speed, ramp: rampOn }).catch(() => {});
+	}
+
+	function rampChanged(checked: boolean) {
+		rampOn = checked;
+		void saveVoiceSpeed({ speed, ramp: checked }).catch(() => {});
 	}
 </script>
 
@@ -142,12 +158,38 @@
 					</p>
 				{/if}
 
+				<div class="space-y-1.5">
+					<Label for="ttsSpeed">Speed</Label>
+					<select
+						id="ttsSpeed"
+						class="flex h-8 w-full border border-input bg-background px-2 text-sm"
+						value={String(speed)}
+						onchange={speedChanged}
+					>
+						{#each SPEED_STEPS as step (step)}
+							<option value={String(step)}>{step}×</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="flex items-center justify-between gap-3 border border-border p-3">
+					<div>
+						<Label for="ttsRamp">Auto ramp</Label>
+						<p class="text-xs text-muted-foreground">
+							+0.1× every 2 minutes up to the speed above.
+						</p>
+					</div>
+					<Switch id="ttsRamp" checked={rampOn} onCheckedChange={rampChanged} />
+				</div>
+
 				<div class="border border-border p-3">
 					<p class="mb-2 text-xs tracking-widest text-muted-foreground uppercase">Test it</p>
 					<Player
 						compact
 						{engine}
 						{voice}
+						{speed}
+						ramp={rampOn}
 						items={[
 							{
 								id: 'test',

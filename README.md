@@ -12,8 +12,11 @@ Audio is the differentiator, and it costs **$0 forever** because synthesis runs 
   modify or label mail. "Organizing" happens in this app's own database, never written back to Gmail.
 - **BYO-AI** — any OpenAI-compatible endpoint: OpenAI, Groq, OpenRouter, or a local Ollama / LM Studio.
   It is one Settings value, not a code change.
-- **Local voices by default** — Kitten (~24MB) and Kokoro (~90MB) load once in the browser, then work
+- **Local voices by default** — Kitten (~57MB) and Kokoro (~90MB) load once in the browser, then work
   offline. Web Speech is the zero-download fallback. Google/MiniMax cloud voices are opt-in.
+- **A free local reader** — `/read` takes any pasted text and reads it aloud: speeds
+  0.75×–3×, an auto-ramp that adds 0.1× every two minutes up to your chosen cap, no account
+  needed. Text never leaves the device.
 - **Self-hosted** — `docker compose up`, or `bun run dev` for development.
 
 ## Quick start (development)
@@ -77,7 +80,9 @@ ORIGIN="http://localhost:5173"     # must match the redirect URI origin
 Sign in with Google (it asks for consent — that is what mints the refresh token), then press
 **Connect Gmail** on the Inbox page. Tokens are encrypted at rest with `AUTH_TOKEN_SECRET`.
 
-Email/password sign-in works out of the box too, if you just want to look around.
+Sign-in is **Google-only** — email/password is deliberately disabled server-side, so a deployment
+you accidentally leave reachable can't be signed up on; only the test users you listed on the consent
+screen can get in.
 
 ## AI endpoint
 
@@ -98,16 +103,30 @@ non-fatal: the inbox still renders raw, and each message gets a **Re-organize** 
 
 | Engine      | Download | Runs where      | Notes                               |
 | ----------- | -------- | --------------- | ----------------------------------- |
-| `kitten`    | ~24MB    | in your browser | default, Apache-2.0, 8 voices       |
+| `kitten`    | ~57MB    | in your browser | default, Apache-2.0, 8 voices       |
 | `kokoro`    | ~90MB    | in your browser | hi-fi option, WebGPU when available |
 | `webspeech` | 0MB      | OS voices       | instant fallback                    |
 | `google`    | 0MB      | Google servers  | opt-in, needs `GOOGLE_TTS_KEY`      |
 | `minimax`   | 0MB      | MiniMax servers | opt-in, needs `MINIMAX_*`           |
 
-The local engines are lazy-loaded from `PUBLIC_TTS_CDN` (default `https://esm.sh`) the first time you
-press Play, with an explicit _"downloads ~24MB once"_ notice — the ONNX runtimes are **not** bundled as
-npm dependencies (that would be ~450MB on disk). Point `PUBLIC_TTS_CDN` at your own mirror to run
+The local engines are lazy-loaded from `PUBLIC_TTS_CDN` (default
+`https://cdn.jsdelivr.net/npm`, addressed as `<base>/<pkg>/+esm`) the first time you press Play, with
+an explicit _"downloads ~57MB once"_ notice — the ONNX runtimes are **not** bundled as npm
+dependencies (that would be ~450MB on disk). The base must be jsDelivr-style: esm.sh injects a Node
+`process` shim, which makes the loaders take their Node path and fail with
+`[unenv] fs.mkdirSync is not implemented yet!`. Point `PUBLIC_TTS_CDN` at your own mirror to run
 fully offline. Text for local engines never leaves the device.
+
+## Paste & read
+
+`/read` is a standalone reader: paste an article, a chapter or a PDF page and press play. It
+runs entirely in the browser — **nothing is uploaded, no sign-in required** (sign in and it
+picks up your saved engine, voice and speed).
+
+| Control   | Values                                                     |
+| --------- | ---------------------------------------------------------- |
+| Speed     | 0.75× · 1× · 1.25× · 1.5× · 1.75× · 2× · 2.5× · 3×         |
+| Auto ramp | +0.1× every 2 minutes of playback, up to your chosen speed |
 
 ## Self-host with Docker
 
@@ -134,7 +153,7 @@ TLS in front of it in production, and set `ORIGIN` to the public URL.
 | `TTS_ENGINE`                           | no              | `kitten` (default) \| `kokoro` \| `webspeech` \| `google` \| `minimax` |
 | `GOOGLE_TTS_KEY`                       | for cloud voice | Google Cloud text-to-speech                                            |
 | `MINIMAX_API_KEY` / `MINIMAX_GROUP_ID` | for cloud voice | MiniMax                                                                |
-| `PUBLIC_TTS_CDN`                       | no              | where the browser loads the local engines from                         |
+| `PUBLIC_TTS_CDN`                       | no              | npm CDN base (`<base>/<pkg>/+esm`) for the local engines               |
 
 ## Architecture
 
@@ -143,7 +162,7 @@ src/
   lib/
     types/mail.ts            Valibot schemas shared by client + server (DTOs, filters, settings)
     server/
-      auth.ts                Better Auth (Google + email/password, Drizzle adapter)
+      auth.ts                Better Auth (Google-only sign-in, Drizzle adapter)
       db/                    Drizzle schema: auth tables, mail_account, message, settings
       gmail.ts               Gmail REST client (list → get → parse to plain text)
       ai.ts                  OpenAI-compatible client, strict JSON, one retry on parse failure

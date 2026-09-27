@@ -14,12 +14,39 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 	spam_suspect: 'Spam suspect'
 };
 
+/** Structured facts worth remembering from a message (dates, amounts, links, people). */
+export const factsSchema = v.object({
+	dates: v.optional(v.array(v.string()), []),
+	amounts: v.optional(v.array(v.string()), []),
+	links: v.optional(v.array(v.object({ label: v.string(), url: v.string() })), []),
+	people: v.optional(v.array(v.string()), [])
+});
+export type Facts = v.InferOutput<typeof factsSchema>;
+export const NO_FACTS: Facts = { dates: [], amounts: [], links: [], people: [] };
+
+/** Expandable bullet view of one message — generated on first open, then cached. */
+export const detailsSchema = v.object({
+	keyPoints: v.array(v.string()),
+	askOfYou: v.string(),
+	deadlines: v.array(v.string())
+});
+export type MessageDetails = v.InferOutput<typeof detailsSchema>;
+
+/** What the AI says about a whole conversation (stored once per thread). */
+export const threadNarrativeSchema = v.object({
+	summary: v.string(),
+	highlights: v.array(v.string())
+});
+export type ThreadNarrative = v.InferOutput<typeof threadNarrativeSchema>;
+
 /** Strict JSON shape the AI endpoint must return. */
 export const classificationSchema = v.object({
 	category: categorySchema,
 	summary: v.pipe(v.string(), v.maxLength(400)),
 	priority: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(5)),
-	actionItems: v.array(v.string())
+	actionItems: v.array(v.string()),
+	/** Defaults to empty so a model that omits facts still classifies. */
+	facts: v.optional(factsSchema, NO_FACTS)
 });
 export type Classification = v.InferOutput<typeof classificationSchema>;
 
@@ -37,6 +64,11 @@ export const messageDtoSchema = v.object({
 	summary: v.nullable(v.string()),
 	priority: v.nullable(v.number()),
 	actionItems: v.array(v.string()),
+	facts: v.nullable(factsSchema),
+	/** TTS-friendly rewrite of a long body — omitted from the list view. */
+	spokenText: v.nullable(v.string()),
+	/** Messages in this conversation (local sync); only `getMessage` fills it. */
+	threadCount: v.optional(v.number()),
 	organizedAt: v.nullable(v.date()),
 	organizeError: v.nullable(v.string()),
 	isDigested: v.boolean()
@@ -44,7 +76,7 @@ export const messageDtoSchema = v.object({
 export type MessageDto = v.InferOutput<typeof messageDtoSchema>;
 
 /** List view — no bodies, so an inbox page stays light. */
-export const inboxItemSchema = v.omit(messageDtoSchema, ['bodyText', 'labelIds']);
+export const inboxItemSchema = v.omit(messageDtoSchema, ['bodyText', 'labelIds', 'spokenText']);
 export type InboxItem = v.InferOutput<typeof inboxItemSchema>;
 
 export const TTS_ENGINES = ['kitten', 'kokoro', 'webspeech', 'google', 'minimax'] as const;
@@ -93,7 +125,8 @@ export const digestItemSchema = v.object({
 	summary: v.string(),
 	priority: v.number(),
 	receivedAt: v.date(),
-	actionItems: v.array(v.string())
+	actionItems: v.array(v.string()),
+	facts: v.nullable(factsSchema)
 });
 export type DigestItem = v.InferOutput<typeof digestItemSchema>;
 

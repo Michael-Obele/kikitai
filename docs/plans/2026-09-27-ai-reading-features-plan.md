@@ -46,7 +46,7 @@
 **Interfaces:**
 - Produces: `Facts` (`{ dates, amounts, links:[{label,url}], people }`), `MessageDetails` (`{ keyPoints, askOfYou, deadlines }`), `ThreadNarrative` (`{ summary, highlights }`); `messageDtoSchema` gains `facts`, `spokenText`, optional `threadCount`; `threadSummary` table (`accountId`, `threadId`, `summary`, `highlights`, `messageCount`).
 
-- [ ] **Step 1 — add the three schemas to `src/lib/types/mail.ts`, directly above `classificationSchema`**
+- [x] **Step 1 — add the three schemas to `src/lib/types/mail.ts`, directly above `classificationSchema`**
 
 ```ts
 /** Structured facts worth remembering from a message (dates, amounts, links, people). */
@@ -78,7 +78,7 @@ export const threadNarrativeSchema = v.object({
 export type ThreadNarrative = v.InferOutput<typeof threadNarrativeSchema>;
 ```
 
-- [ ] **Step 2 — in the same file, give `classificationSchema` a `facts` field**
+- [x] **Step 2 — in the same file, give `classificationSchema` a `facts` field**
 
 ```ts
 export const classificationSchema = v.object({
@@ -91,7 +91,7 @@ export const classificationSchema = v.object({
 });
 ```
 
-- [ ] **Step 3 — extend `messageDtoSchema`, `inboxItemSchema`, `digestItemSchema` in the same file**
+- [x] **Step 3 — extend `messageDtoSchema`, `inboxItemSchema`, `digestItemSchema` in the same file**
 
 ```ts
 	actionItems: v.array(v.string()),
@@ -121,7 +121,7 @@ export const digestItemSchema = v.object({
 });
 ```
 
-- [ ] **Step 4 — columns and table in `src/lib/server/db/schema.ts`**
+- [x] **Step 4 — columns and table in `src/lib/server/db/schema.ts`**
 
 Add `jsonb` to the `drizzle-orm/pg-core` import and `import type { Facts } from '$lib/types/mail';`. Inside the `message` table, after `organizeError:`:
 
@@ -161,7 +161,7 @@ export const threadSummary = pgTable(
 );
 ```
 
-- [ ] **Step 5 — map the new fields in `src/lib/remote/mail.remote.ts`**
+- [x] **Step 5 — map the new fields in `src/lib/remote/mail.remote.ts`**
 
 In `toInboxItem` / `toMessageDto` (they share one body — add after `actionItems`):
 
@@ -199,12 +199,12 @@ In `getDigest`, pass facts into the parse (it validates with `digestItemSchema`)
 		})
 ```
 
-- [ ] **Step 6 — migrate**
+- [x] **Step 6 — migrate** (applied 2026-09-27 via `bunx drizzle-kit push --force` — plain `db:push` needs a TTY for its confirmation prompt)
 
 Run: `bun run db:push`
 Expected: Drizzle lists **5 ADD COLUMN** on `message` and **CREATE TABLE `thread_summary`** — nothing dropped. Neon, additive only.
 
-- [ ] **Step 7 — type-check**
+- [x] **Step 7 — type-check**
 
 Run: `bun run check`
 Expected: `0 errors and 0 warnings` (facts are `null` everywhere until Task 2).
@@ -229,7 +229,7 @@ git commit -m "feat(db): facts, details, spoken text and thread summary"
 - Consumes: `factsSchema`, `NO_FACTS`, `Facts` (Task 1).
 - Produces: `Classification` now always carries `facts`; every organize path writes `message.facts`.
 
-- [ ] **Step 1 — `src/lib/server/ai.ts`: import the schema**
+- [x] **Step 1 — `src/lib/server/ai.ts`: import the schema**
 
 ```ts
 import {
@@ -243,7 +243,7 @@ import {
 } from '$lib/types/mail';
 ```
 
-- [ ] **Step 2 — teach the system prompt about facts (replace the `Rules:` block and the JSON example)**
+- [x] **Step 2 — teach the system prompt about facts (replace the `Rules:` block and the JSON example)**
 
 ```ts
 const SYSTEM_PROMPT = `You organize an inbox. Classify each message into exactly one category:
@@ -263,7 +263,7 @@ Answer with a single JSON object: an array with one entry per message:
 No markdown, no commentary.`;
 ```
 
-- [ ] **Step 3 — accept `facts` in `entrySchema` and return it**
+- [x] **Step 3 — accept `facts` in `entrySchema` and return it**
 
 ```ts
 const entrySchema = v.object({
@@ -288,7 +288,7 @@ In `organizeBatch`'s map loop:
 		});
 ```
 
-- [ ] **Step 4 — persist facts in both write paths**
+- [x] **Step 4 — persist facts in both write paths**
 
 `src/lib/server/organize.ts` (inside the successful `.set({...})`):
 
@@ -341,7 +341,7 @@ git commit -m "feat(ai): extract facts with the classification"
 **Interfaces:**
 - Produces: `askJson<T>(config, messages, parse): Promise<T>`; `detailsFor(config, input: OrganizeInput): Promise<MessageDetails>`; `loadDetails(id): Promise<{ id, details: MessageDetails, cached: boolean }>` (command).
 
-- [ ] **Step 1 — `src/lib/server/ai.ts`: add `askJson` after `extractJson`**
+- [x] **Step 1 — `src/lib/server/ai.ts`: add `askJson` after `extractJson`**
 
 ```ts
 /**
@@ -378,7 +378,7 @@ async function askJson<T>(
 }
 ```
 
-- [ ] **Step 2 — rebuild `organizeBatch` on top of it (replaces the whole function body)**
+- [x] **Step 2 — rebuild `organizeBatch` on top of it (replaces the whole function body)**
 
 ```ts
 export async function organizeBatch(
@@ -418,7 +418,7 @@ export async function organizeBatch(
 }
 ```
 
-- [ ] **Step 3 — add the details prompt and helper (below `organizeBatch`)**
+- [x] **Step 3 — add the details prompt and helper (below `organizeBatch`)**
 
 ```ts
 const DETAILS_PROMPT = `You explain one email to a busy reader who will act on it.
@@ -452,7 +452,7 @@ export async function detailsFor(config: AiConfig, input: OrganizeInput): Promis
 
 (`detailsSchema` comes from `$lib/types/mail` — add it to the Task 1 import.)
 
-- [ ] **Step 4 — `src/lib/remote/ai.remote.ts`: shared ownership check + the command**
+- [x] **Step 4 — `src/lib/remote/ai.remote.ts`: shared ownership check + the command**
 
 After the existing imports, add a helper and use it in `regenerateSummary` (replacing its inline account-lookup block):
 
@@ -500,13 +500,13 @@ export const loadDetails = command(v.string(), async (id: string) => {
 });
 ```
 
-- [ ] **Step 5 — export it from `src/lib/remote/index.ts`**
+- [x] **Step 5 — export it from `src/lib/remote/index.ts`**
 
 ```ts
 export { organizeMail, regenerateSummary, loadDetails, loadListenScript } from './ai.remote';
 ```
 
-- [ ] **Step 6 — verify**
+- [x] **Step 6 — verify** (live: `detailsFor` → 6 keyPoints, askOfYou, deadlines in 9.8s)
 
 Run: `bun run check` → `0 errors and 0 warnings`. Live: pressing the (Task 6) Details button should print one `[ai] → POST` and one `[ai] validated…`-free success; until then confirm from the server by calling it once through the UI-less path — `grep '\[ai\]' <log>` after `Re-organize` still shows the old behaviour, so defer the live click to Task 6.
 
@@ -530,7 +530,7 @@ git commit -m "feat(ai): on-demand message details"
 **Interfaces:**
 - Produces: `getThread(token, threadId): Promise<GmailMessage[]>`; `threadSummaryFor(config, entries): Promise<ThreadNarrative>`; `loadThreadSummary(id): Promise<{ threadId, summary, highlights, messageCount, cached }>` (command, lives in `mail.remote.ts` because it owns token access).
 
-- [ ] **Step 1 — `src/lib/server/gmail.ts`: add `getThread` next to `fetchMessages`**
+- [x] **Step 1 — `src/lib/server/gmail.ts`: add `getThread` next to `fetchMessages`**
 
 ```ts
 export type GmailThread = { id?: string; messages?: GmailMessage[] };
@@ -542,7 +542,7 @@ export async function getThread(token: string, threadId: string): Promise<GmailM
 }
 ```
 
-- [ ] **Step 2 — `src/lib/server/ai.ts`: the thread prompt and helper**
+- [x] **Step 2 — `src/lib/server/ai.ts`: the thread prompt and helper**
 
 ```ts
 const THREAD_PROMPT = `You summarize one email conversation for someone who will listen to it.
@@ -576,7 +576,7 @@ export async function threadSummaryFor(
 
 (`threadNarrativeSchema` joins the Task 1 import.)
 
-- [ ] **Step 3 — `src/lib/remote/mail.remote.ts`: the command**
+- [x] **Step 3 — `src/lib/remote/mail.remote.ts`: the command**
 
 Add `threadSummary` to the schema import, `threadSummaryFor` from `$lib/server/ai`, `type ThreadNarrative` from `$lib/types/mail`, then:
 
@@ -674,7 +674,7 @@ export const loadThreadSummary = command(v.string(), async (id: string) => {
 
 Also add `getAiConfig` to the imports from `$lib/server/settings` (it is already imported — verify before adding a duplicate).
 
-- [ ] **Step 4 — export it: `src/lib/remote/index.ts`**
+- [x] **Step 4 — export it: `src/lib/remote/index.ts`**
 
 ```ts
 export {
@@ -689,7 +689,7 @@ export {
 } from './mail.remote';
 ```
 
-- [ ] **Step 5 — verify**
+- [x] **Step 5 — verify** (live: real 2-message GitHub thread → 5 highlights + summary in 2.0s)
 
 Run: `bun run check` → `0 errors and 0 warnings`.
 
@@ -711,7 +711,7 @@ git commit -m "feat(ai): on-demand conversation summary"
 **Interfaces:**
 - Produces: `listenScriptFor(config, input: OrganizeInput): Promise<string>`; `loadListenScript(id): Promise<{ id, spokenText, cached }>` (command).
 
-- [ ] **Step 1 — `src/lib/server/ai.ts`: prompt, schema and helper**
+- [x] **Step 1 — `src/lib/server/ai.ts`: prompt, schema and helper**
 
 ```ts
 const LISTEN_PROMPT = `You rewrite one email so a text-to-speech voice reads it naturally.
@@ -747,7 +747,7 @@ export async function listenScriptFor(config: AiConfig, input: OrganizeInput): P
 }
 ```
 
-- [ ] **Step 2 — `src/lib/remote/ai.remote.ts`: the command (imports `listenScriptFor`)**
+- [x] **Step 2 — `src/lib/remote/ai.remote.ts`: the command (imports `listenScriptFor`)**
 
 ```ts
 /** Spoken rewrite of a long body — generated on first play, then served from the row. */
@@ -775,7 +775,7 @@ export const loadListenScript = command(v.string(), async (id: string) => {
 });
 ```
 
-- [ ] **Step 3 — verify**
+- [x] **Step 3 — verify** (live: 29k-char body → 1442 words, no URLs, 96.7s — slow, see note)
 
 Run: `bun run check` → `0 errors and 0 warnings`.
 
@@ -800,7 +800,7 @@ git commit -m "feat(ai): on-demand listen script for long mail"
 - Consumes: `loadDetails`, `loadThreadSummary`, `loadListenScript` (Tasks 3–5), `Facts` / `MessageDetails` types (Task 1), `full.threadCount` / `full.spokenText` (Task 1).
 - Produces: `<FactsChips facts={...} />` usable anywhere an item renders.
 
-- [ ] **Step 1 — create `src/lib/components/inbox/facts-chips.svelte`**
+- [x] **Step 1 — create `src/lib/components/inbox/facts-chips.svelte`**
 
 ```svelte
 <script lang="ts">
@@ -853,7 +853,7 @@ git commit -m "feat(ai): on-demand listen script for long mail"
 {/if}
 ```
 
-- [ ] **Step 2 — chips in the list card: `message-card.svelte`**
+- [x] **Step 2 — chips in the list card: `message-card.svelte`**
 
 Add `import FactsChips from './facts-chips.svelte';` after the existing imports, and after the `{#if item.summary} … {:else} … {/if}` block inside the text column:
 
@@ -861,7 +861,7 @@ Add `import FactsChips from './facts-chips.svelte';` after the existing imports,
 			<FactsChips facts={item.facts} />
 ```
 
-- [ ] **Step 3 — chips in the digest: `src/routes/(app)/digest/+page.svelte`**
+- [x] **Step 3 — chips in the digest: `src/routes/(app)/digest/+page.svelte`**
 
 Add `import FactsChips from '$lib/components/inbox/facts-chips.svelte';`, and after the summary paragraph (`<p class="mt-2 text-sm text-muted-foreground">{item.summary}</p>`):
 
@@ -869,7 +869,7 @@ Add `import FactsChips from '$lib/components/inbox/facts-chips.svelte';`, and af
 								<FactsChips facts={item.facts} />
 ```
 
-- [ ] **Step 4 — `message-panel.svelte`: imports and state**
+- [x] **Step 4 — `message-panel.svelte`: imports and state**
 
 ```svelte
 	import { toast } from 'svelte-sonner';
@@ -937,7 +937,7 @@ Inside `<script>`, after `let reorganizing = $state(false);`:
 
 Change `reorganize()`'s `console.error(errorMessage(error))` to `toast.error(errorMessage(error))`.
 
-- [ ] **Step 5 — chips + Details card in the panel**
+- [x] **Step 5 — chips + Details card in the panel**
 
 After the summary block (`{#if item.summary} … {/if}`), still inside `<div class="space-y-4">`:
 
@@ -975,7 +975,7 @@ After the summary block (`{#if item.summary} … {/if}`), still inside `<div cla
 	</section>
 ```
 
-- [ ] **Step 6 — Conversation card + Make listenable inside `{:then full}`**
+- [x] **Step 6 — Conversation card + Make listenable inside `{:then full}`**
 
 After the body block and before the Player row, and after the Player row respectively:
 

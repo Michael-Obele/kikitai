@@ -12,7 +12,9 @@ export const auth = betterAuth({
 	baseURL: env.ORIGIN,
 	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: 'pg' }),
-	emailAndPassword: { enabled: true },
+	// Google is the ONLY sign-in method: a deployment left reachable on the internet must not be
+	// sign-uppable on (only the Google consent-screen test users can get in). See docs/google-oauth.md.
+	emailAndPassword: { enabled: false },
 	socialProviders: {
 		google: {
 			clientId: env.GOOGLE_CLIENT_ID || '',

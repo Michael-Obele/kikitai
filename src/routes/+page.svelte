@@ -1,214 +1,345 @@
 <script lang="ts">
-	import { AudioLines, ArrowRight, Inbox, ShieldCheck, Sparkles, Volume2 } from '@lucide/svelte';
+	import {
+		AudioLines,
+		ArrowRight,
+		Ban,
+		Check,
+		ClipboardPaste,
+		Copy,
+		Cpu,
+		HardDrive,
+		Lock,
+		Server,
+		Volume2
+	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
 	import { Separator } from '$lib/components/ui/separator';
+	import ThemeToggle from '$lib/components/theme-toggle.svelte';
+	import Reveal from '$lib/components/landing/reveal.svelte';
+	import DigestMock from '$lib/components/landing/digest-mock.svelte';
+	import InboxChart from '$lib/components/landing/inbox-chart.svelte';
+	import Workflow from '$lib/components/landing/workflow.svelte';
+	import Comparison from '$lib/components/landing/comparison.svelte';
+	import Faq from '$lib/components/landing/faq.svelte';
 
-	const pillars = [
+	/** The four numbers that matter, placed right under the hero. */
+	const figures = [
+		{ value: '$0', label: 'the voice, forever' },
+		{ value: '57MB', label: 'downloaded once' },
+		{ value: '1', label: 'OAuth scope' },
+		{ value: '0', label: 'writes back to Gmail' }
+	];
+
+	/** Specifics, because developers buy specifics. */
+	const inside = [
 		{
-			icon: Sparkles,
-			title: 'It sorts the mail',
-			body: 'Every new message gets a category, a two-line summary and a priority — from any OpenAI-compatible endpoint, including a local model on your own machine.'
+			icon: Cpu,
+			label: 'The AI endpoint',
+			value:
+				'Any OpenAI-compatible base URL with a key and a model name. OpenAI, Groq, OpenRouter, or Ollama on your own machine. It is a field in Settings, not a rebuild.'
+		},
+		{
+			icon: HardDrive,
+			label: 'Your own database',
+			value:
+				'Postgres with Drizzle. Messages, categories, summaries and priorities sit in your tables, on your disk.'
 		},
 		{
 			icon: Volume2,
-			title: 'It reads it aloud',
-			body: 'A local neural voice speaks the morning digest in your browser. The text never leaves the device, and the running cost stays $0 forever.'
+			label: 'Four voices to pick from',
+			value:
+				'Kitten is the default at about 57MB. Kokoro is the smoother one at about 90MB. The system voice is instant and 0MB. Google and MiniMax are there if you want a cloud voice.'
 		},
 		{
-			icon: ShieldCheck,
-			title: 'It only reads',
-			body: 'One restricted scope, gmail.readonly. No sending, no deleting, no labels written back. Your labels live in this app’s own database.'
+			icon: Lock,
+			label: 'Secrets at rest',
+			value:
+				'OAuth tokens and your AI key are encrypted before they are stored. Neither ever reaches the browser.'
+		},
+		{
+			icon: Server,
+			label: 'Two ways to run it',
+			value:
+				'docker compose up for a server, bun run dev for your laptop. Postgres ships with the compose file.'
+		},
+		{
+			icon: Ban,
+			label: 'What it cannot do',
+			value:
+				'No sending, no replying, no archiving, no deleting, no writing labels back to Gmail. No telemetry either.'
+		},
+		{
+			icon: ClipboardPaste,
+			label: 'Paste & read',
+			value:
+				'Any text you copy — an article, a chapter, a PDF page — pasted into /read and read aloud at 0.75×–3×, with an optional auto-ramp that speeds up as you listen.'
 		}
 	];
 
-	const steps = [
-		{
-			n: '01',
-			title: 'Connect Gmail',
-			body: 'Your own OAuth client, Testing mode, one read-only scope.'
-		},
-		{
-			n: '02',
-			title: 'Press Sync',
-			body: 'Messages are pulled, parsed to plain text, and organized by your AI endpoint.'
-		},
-		{
-			n: '03',
-			title: 'Press Play',
-			body: 'The digest plays in order, follow-along highlighting each sentence.'
-		}
-	];
+	const install = `cp .env.example .env   # add DATABASE_URL and your Google client
+bun install
+bun run db:push
+bun run dev`;
 
-	const sample = [
-		{
-			from: 'Ada · Ledger',
-			subject: 'Invoice #2291 due Friday',
-			priority: 5,
-			line: 'Ada needs a reply: invoice 2291 is due Friday, payment link attached.'
-		},
-		{
-			from: 'Buildkite',
-			subject: 'Pipeline #482 passed',
-			priority: 2,
-			line: 'Buildkite reports pipeline 482 passed in 3 minutes 12 seconds.'
-		},
-		{
-			from: 'Newsletter',
-			subject: 'This week in WebGPU',
-			priority: 1,
-			line: 'A weekly digest you subscribed to — no action required.'
+	let copied = $state(false);
+
+	async function copyInstall() {
+		try {
+			await navigator.clipboard.writeText(install);
+			copied = true;
+			setTimeout(() => (copied = false), 2000);
+		} catch {
+			copied = false;
 		}
-	];
+	}
 </script>
 
 <svelte:head>
-	<title>Kikitai — your mail, read to you</title>
+	<title>Kikitai — your inbox, read to you</title>
 	<meta
 		name="description"
-		content="Self-hosted AI email organizer that reads your inbox aloud. Read-only Gmail, configurable AI, local text-to-speech."
+		content="Self-hosted AI email organizer that reads your inbox aloud. One read-only Gmail scope, an AI endpoint you choose, and a voice that runs in your browser for free."
 	/>
 </svelte:head>
 
 <div class="min-h-svh">
-	<header class="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
-		<a href={resolve('/')} class="flex items-center gap-2">
-			<span class="grid size-7 place-items-center bg-primary text-primary-foreground">
-				<AudioLines class="size-4" />
-			</span>
-			<span class="font-heading text-lg italic">Kikitai</span>
-		</a>
-		<nav class="flex items-center gap-2">
-			<Button variant="ghost" size="sm" onclick={() => (location.href = '/login')}>Sign in</Button>
-			<Button size="sm" onclick={() => (location.href = '/login')}>
-				Get started <ArrowRight class="size-3.5" />
-			</Button>
-		</nav>
+	<header
+		class="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md supports-backdrop-filter:border-border/60"
+	>
+		<div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+			<a href={resolve('/')} class="flex items-center gap-2.5">
+				<span class="grid size-7 place-items-center bg-primary text-primary-foreground">
+					<AudioLines class="size-4" />
+				</span>
+				<span class="font-heading text-lg italic">Kikitai</span>
+			</a>
+
+			<nav class="flex items-center gap-1">
+				<Button variant="ghost" size="sm" href="#how" class="hidden sm:inline-flex">
+					How it works
+				</Button>
+				<Button variant="ghost" size="sm" href="#privacy" class="hidden sm:inline-flex">
+					Privacy
+				</Button>
+				<Button variant="ghost" size="sm" href="#faq" class="hidden md:inline-flex">
+					Questions
+				</Button>
+				<ThemeToggle />
+				<Button variant="ghost" size="sm" href={resolve('/login')}>Sign in</Button>
+				<Button size="sm" href={resolve('/login')}>
+					Connect
+					<ArrowRight class="size-3.5" />
+				</Button>
+			</nav>
+		</div>
 	</header>
 
-	<main class="mx-auto max-w-5xl px-4 sm:px-6">
-		<section class="grid items-center gap-10 py-14 sm:py-20 lg:grid-cols-[1.1fr_1fr]">
-			<div>
-				<p
-					class="mb-4 inline-flex items-center gap-2 border border-border px-2.5 py-1 text-xs tracking-widest text-muted-foreground uppercase"
-				>
-					<span class="size-1.5 bg-primary"></span>
-					self-hosted · open source · $0 to run
-				</p>
-				<h1 class="font-heading text-4xl leading-[1.05] italic sm:text-6xl">
-					Your inbox,<br />read out loud.
-				</h1>
-				<p class="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-					Kikitai connects your Gmail, lets an AI sort it into a priority digest, and speaks that
-					digest in your browser. No cloud voice, no mail sent on your behalf.
-				</p>
-				<div class="mt-7 flex flex-wrap items-center gap-3">
-					<Button onclick={() => (location.href = '/login')}>
-						Connect your inbox <ArrowRight class="size-4" />
-					</Button>
-					<Button
-						variant="outline"
-						onclick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
-					>
-						How it works
-					</Button>
-				</div>
-			</div>
+	<main>
+		<!-- Hero: centred, with the real thing underneath -->
+		<section class="relative overflow-hidden">
+			<div
+				class="pointer-events-none absolute inset-x-0 -top-40 h-96 bg-[radial-gradient(60%_60%_at_50%_50%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent)]"
+				aria-hidden="true"
+			></div>
 
-			<Card.Root class="overflow-hidden shadow-xl shadow-black/5">
-				<Card.Header class="flex-row items-center justify-between space-y-0">
-					<div class="flex items-center gap-2">
-						<Inbox class="size-4 text-primary" />
-						<Card.Title class="text-sm">Morning digest</Card.Title>
-					</div>
-					<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<span class="size-1.5 animate-pulse rounded-full bg-primary"></span> speaking
-					</span>
-				</Card.Header>
-				<Card.Content class="space-y-3">
-					{#each sample as item, i (item.subject)}
-						<div
-							class="border border-border p-3 {i === 0
-								? 'border-primary/60 bg-primary/5'
-								: 'bg-card'}"
+			<div class="relative mx-auto max-w-6xl px-4 pt-14 pb-16 sm:px-6 sm:pt-20">
+				<div class="mx-auto max-w-3xl text-center">
+					<Reveal>
+						<p
+							class="inline-flex items-center gap-2 border border-border bg-background/60 px-2.5 py-1 text-[11px] tracking-[0.2em] text-muted-foreground uppercase"
 						>
-							<div class="flex items-baseline justify-between gap-3">
-								<p class="truncate text-sm font-medium">{item.subject}</p>
-								<span class="shrink-0 text-[10px] tracking-widest text-muted-foreground">
-									P{item.priority}
-								</span>
-							</div>
-							<p class="mt-0.5 text-xs text-muted-foreground">{item.from}</p>
-							<p class="mt-2 text-sm {i === 0 ? 'text-foreground' : 'text-muted-foreground'}">
-								{#if i === 0}
-									<span class="bg-primary/15 px-0.5">{item.line.slice(0, 28)}</span
-									>{item.line.slice(28)}
-								{:else}
-									{item.line}
-								{/if}
-							</p>
-						</div>
-					{/each}
-					<div class="flex items-center gap-3 pt-1">
-						<AudioLines class="size-4 shrink-0 text-primary" />
-						<div class="h-1 flex-1 bg-muted">
-							<div class="h-full w-1/3 bg-primary"></div>
-						</div>
-						<span class="text-[11px] text-muted-foreground tabular-nums">0:14 / 0:41</span>
-					</div>
-				</Card.Content>
-			</Card.Root>
-		</section>
+							<span class="size-1.5 bg-primary"></span>
+							Self-hosted · open source · the voice costs nothing
+						</p>
+					</Reveal>
 
-		<Separator />
+					<Reveal delay={80}>
+						<h1 class="mt-6 font-heading text-display italic">
+							Your inbox,<br />read to you.
+						</h1>
+					</Reveal>
 
-		<section class="grid gap-8 py-14 sm:grid-cols-3">
-			{#each pillars as pillar (pillar.title)}
-				<div>
-					<pillar.icon class="size-5 text-primary" />
-					<h2 class="mt-3 font-heading text-xl italic">{pillar.title}</h2>
-					<p class="mt-2 text-sm leading-relaxed text-muted-foreground">{pillar.body}</p>
+					<Reveal delay={160}>
+						<p
+							class="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+						>
+							Connect your Gmail. An AI you choose sorts it into a priority digest. A voice in your
+							browser reads that digest back to you while you make coffee.
+						</p>
+					</Reveal>
+
+					<Reveal delay={240}>
+						<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+							<Button size="lg" href={resolve('/login')}>
+								Connect your inbox
+								<ArrowRight class="size-4" />
+							</Button>
+							<Button size="lg" variant="outline" href="#how">See how it works</Button>
+							<Button size="lg" variant="secondary" href={resolve('/read')}>
+								<ClipboardPaste class="size-4" />
+								Try paste &amp; read
+							</Button>
+						</div>
+						<p class="mt-4 text-xs text-muted-foreground">
+							One read-only scope. No cloud voice. Nothing sent on your behalf.
+						</p>
+					</Reveal>
 				</div>
-			{/each}
+
+				<Reveal delay={320} class="mx-auto mt-14 max-w-3xl">
+					<DigestMock />
+				</Reveal>
+			</div>
 		</section>
 
-		<Separator />
-
-		<section id="how" class="py-14">
-			<h2 class="font-heading text-2xl italic">Three steps, then it runs itself</h2>
-			<div class="mt-8 grid gap-6 sm:grid-cols-3">
-				{#each steps as step (step.n)}
-					<div class="border-t-2 border-primary pt-4">
-						<p class="text-xs tracking-widest text-primary">{step.n}</p>
-						<h3 class="mt-2 text-base font-medium">{step.title}</h3>
-						<p class="mt-1.5 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
-					</div>
+		<!-- The four numbers -->
+		<section class="border-y bg-muted/30">
+			<div class="mx-auto grid max-w-6xl grid-cols-2 gap-y-8 px-4 py-10 sm:px-6 lg:grid-cols-4">
+				{#each figures as fig, i (fig.label)}
+					<Reveal delay={i * 70}>
+						<p class="font-heading text-3xl italic tabular-nums sm:text-4xl">{fig.value}</p>
+						<p class="mt-1 text-xs text-muted-foreground">{fig.label}</p>
+					</Reveal>
 				{/each}
 			</div>
 		</section>
 
-		<section class="border border-border bg-muted/40 p-6 sm:p-10">
-			<div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-				<div>
-					<h2 class="font-heading text-2xl italic">Run it yourself tonight</h2>
-					<p class="mt-2 max-w-lg text-sm text-muted-foreground">
-						<code class="text-foreground">bun install && bun run dev</code>, your own Google OAuth
-						client, one AI endpoint. Nothing provider-specific is hardcoded — cloud or local model,
-						your call.
-					</p>
+		<!-- The problem, then the proof -->
+		<section class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+			<Reveal>
+				<p class="text-[11px] tracking-[0.2em] text-muted-foreground uppercase">The wall of text</p>
+				<h2 class="mt-3 max-w-3xl font-heading text-title italic">
+					You do not need to read forty seven messages. You need the six that need you.
+				</h2>
+				<p class="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+					Kikitai reads the whole pile so you can read the small part. Here is what a normal Tuesday
+					looks like once it has been through the organizer, and what it does to the time you spend
+					on mail.
+				</p>
+			</Reveal>
+
+			<Reveal delay={120} class="mt-12">
+				<InboxChart />
+			</Reveal>
+		</section>
+
+		<Separator />
+
+		<!-- One job, four steps -->
+		<section id="how" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 sm:py-24">
+			<Reveal>
+				<Workflow />
+			</Reveal>
+		</section>
+
+		<Separator />
+
+		<!-- Read-only, and why that matters -->
+		<section id="privacy" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 sm:py-24">
+			<Reveal>
+				<Comparison />
+			</Reveal>
+		</section>
+
+		<Separator />
+
+		<!-- What you actually get -->
+		<section id="inside" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 sm:py-24">
+			<Reveal>
+				<p class="text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
+					What is in the box
+				</p>
+				<h2 class="mt-3 font-heading text-title italic">Specifics, not adjectives</h2>
+			</Reveal>
+
+			<div class="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+				{#each inside as item, i (item.label)}
+					<Reveal delay={(i % 3) * 80}>
+						<div class="flex items-center gap-2">
+							<item.icon class="size-4 text-primary" />
+							<h3 class="text-sm font-medium">{item.label}</h3>
+						</div>
+						<p class="mt-2.5 text-sm leading-relaxed text-muted-foreground">{item.value}</p>
+					</Reveal>
+				{/each}
+			</div>
+
+			<Reveal delay={120} class="mt-14">
+				<div class="border bg-card">
+					<div class="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
+						<span class="font-mono text-[11px] text-muted-foreground">bun</span>
+						<Button variant="ghost" size="xs" onclick={copyInstall}>
+							{#if copied}
+								<Check class="size-3" />
+								Copied
+							{:else}
+								<Copy class="size-3" />
+								Copy
+							{/if}
+						</Button>
+					</div>
+					<pre class="overflow-x-auto px-4 py-4 font-mono text-xs leading-relaxed"><code
+							>{install}</code
+						></pre>
 				</div>
-				<Button onclick={() => (location.href = '/login')}>
-					Open Kikitai <ArrowRight class="size-4" />
-				</Button>
+				<p class="mt-3 text-xs text-muted-foreground">
+					The Google client takes about five minutes to make. The steps are written out in
+					<code class="text-foreground">docs/google-oauth.md</code>, including which scope to tick
+					and why you can leave the app in testing mode.
+				</p>
+			</Reveal>
+		</section>
+
+		<Separator />
+
+		<!-- Objections -->
+		<section id="faq" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 sm:py-24">
+			<Reveal>
+				<Faq />
+			</Reveal>
+		</section>
+
+		<!-- Last chance -->
+		<section class="border-t bg-foreground text-background">
+			<div class="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-20">
+				<Reveal>
+					<h2 class="font-heading text-title italic">Run it yourself tonight</h2>
+					<p class="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-background/70">
+						One command, your own Google client, one AI endpoint. Nothing provider specific is
+						hardcoded, so the same build works with a cloud key or a model on your own machine.
+					</p>
+					<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+						<Button size="lg" href={resolve('/login')}>
+							Connect your inbox
+							<ArrowRight class="size-4" />
+						</Button>
+						<Button
+							size="lg"
+							variant="outline"
+							href="#inside"
+							class="border-background/30 bg-transparent text-background hover:bg-background/10 hover:text-background dark:bg-transparent"
+						>
+							Read the setup steps
+						</Button>
+					</div>
+				</Reveal>
 			</div>
 		</section>
 	</main>
 
-	<footer
-		class="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-10 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6"
-	>
-		<p>Kikitai (聞きたい) — “I want to hear it.”</p>
-		<p>gmail.readonly · no telemetry · no cloud TTS required</p>
+	<footer class="border-t">
+		<div
+			class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-10 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6"
+		>
+			<p>Kikitai (聞きたい) means “I want to hear it.”</p>
+			<p class="flex flex-wrap items-center gap-x-4 gap-y-1">
+				<span>gmail.readonly only</span>
+				<span class="text-border">·</span>
+				<span>no telemetry</span>
+				<span class="text-border">·</span>
+				<span>no cloud voice required</span>
+			</p>
+		</div>
 	</footer>
 </div>

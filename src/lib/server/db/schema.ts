@@ -3,12 +3,14 @@ import {
 	boolean,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	real,
 	text,
 	timestamp,
 	uniqueIndex
 } from 'drizzle-orm/pg-core';
+import type { Facts } from '$lib/types/mail';
 import { user } from './auth.schema';
 
 export * from './auth.schema';
@@ -72,14 +74,43 @@ export const message = pgTable(
 		actionItems: text('action_items').array().notNull().default([]),
 		organizedAt: timestamp('organized_at'),
 		organizeError: text('organize_error'),
+		/** Structured facts from the classification — never written back to Gmail. */
+		facts: jsonb('facts').$type<Facts | null>(),
+		/** Bullet "Details" card as JSON text — cached after the first open. */
+		details: text('details'),
+		detailsAt: timestamp('details_at'),
+		/** Spoken rewrite of a long body — cached after the first play. */
+		spokenText: text('spoken_text'),
+		spokenAt: timestamp('spoken_at'),
 		isDigested: boolean('is_digested').notNull().default(false),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(t) => [
 		uniqueIndex('message_account_gmail_unique').on(t.accountId, t.gmailId),
 		index('message_account_received_idx').on(t.accountId, t.receivedAt),
-		index('message_account_organized_idx').on(t.accountId, t.organizedAt)
+		index('message_account_organized_idx').on(t.accountId, t.organizedAt),
+		index('message_account_thread_idx').on(t.accountId, t.threadId)
 	]
+);
+
+/**
+ * One summary per conversation, shared by every message in the thread.
+ * Generated on demand, then cached — the AI is never asked twice.
+ */
+export const threadSummary = pgTable(
+	'thread_summary',
+	{
+		id: id(),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => mailAccount.id, { onDelete: 'cascade' }),
+		threadId: text('thread_id').notNull(),
+		summary: text('summary').notNull().default(''),
+		highlights: text('highlights').array().notNull().default([]),
+		messageCount: integer('message_count').notNull().default(0),
+		generatedAt: timestamp('generated_at').defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('thread_summary_account_thread_unique').on(t.accountId, t.threadId)]
 );
 
 /**

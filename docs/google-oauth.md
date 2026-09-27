@@ -52,8 +52,12 @@ on first sign-in.
 6. **Data Access** _(old label: "Scopes")_ → **ADD OR REMOVE SCOPES**:
    - Search `gmail.readonly` and tick **`https://www.googleapis.com/auth/gmail.readonly`**
      (Gmail API → _Read all messages and settings_).
-   - The `.../auth/userinfo.email` and `.../auth/userinfo.profile` scopes are added automatically —
-     keep them.
+   - Search and tick **`https://www.googleapis.com/auth/userinfo.email`** and
+     **`https://www.googleapis.com/auth/userinfo.profile`** (category _UserInfo_ / _OpenID Connect_ —
+     they show up as _See your personal info, including your primary email address and profile
+     picture_). **These are NOT added automatically** — the Data Access list starts empty, so add all
+     three yourself. `userinfo.email` is what puts your Google address on the session row; without it
+     sign-in fails.
    - **UPDATE** → **SAVE AND CONTINUE**. Everything else stays unchecked: Kikitai never sends,
      deletes, labels or modifies mail.
 7. **Audience → Test users** → **ADD USERS**:
@@ -122,6 +126,28 @@ button only appears once both values are set — Better Auth hides it and logs
 | Google button missing from the login page                            | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` empty or the server wasn't restarted.                                                                                                      |
 | `Social provider google is missing clientId or clientSecret` in logs | Same as above.                                                                                                                                                                         |
 | Signed in, but **Connect Gmail** 401s                                | Refresh token revoked or expired — sign out, sign in again (consent is forced with `prompt: 'consent'`).                                                                               |
+
+## Sign-in is Google-only (on purpose)
+
+Kikitai has **no email/password login**: `emailAndPassword.enabled = false` in
+`src/lib/server/auth.ts` and `src/routes/login/+page.svelte` shows only the Google button. Two
+reasons:
+
+- Google is already the identity check — a session and the Gmail connection come from the same
+  account, so a second credential path is just extra attack surface.
+- On a deployment reachable from the internet, an open sign-up form lets strangers create accounts
+  and burn your AI key / database / bandwidth.
+
+What actually keeps others out, in order:
+
+1. **Testing** publishing status + **test users** on the consent screen — Google refuses consent for
+   anyone you didn't list (`Access blocked: app has not been verified`), so no stranger can obtain a
+   session at all.
+2. Google-only sign-in — there is no password to guess or leak.
+3. Per-user data: mail tokens are stored per user id, so even a stray account would only ever see
+   Gmail it connected itself.
+
+Keep the consent screen in **Testing** (step 3.3) unless you deliberately publish it.
 
 ## Testing-mode limits (intentional)
 

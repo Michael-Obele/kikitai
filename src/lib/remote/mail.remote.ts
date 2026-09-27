@@ -1,13 +1,14 @@
 import { error } from '@sveltejs/kit';
-import { command, query } from '$app/server';
-import { and, desc, eq, gte, ilike, inArray, isNull, or, asc } from 'drizzle-orm';
+import { command, query, requested } from '$app/server';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm';
 import * as v from 'valibot';
 import { requireUser } from '$lib/server/session';
 import { db } from '$lib/server/db';
-import { account, mailAccount, message } from '$lib/server/db/schema';
+import { account, mailAccount, message, threadSummary } from '$lib/server/db/schema';
 import * as gmailApi from '$lib/server/gmail';
 import { decrypt, encrypt } from '$lib/server/tokens';
 import { getAiConfig, getSettings } from '$lib/server/settings';
+import { threadSummaryFor } from '$lib/server/ai';
 import { organizePending } from '$lib/server/organize';
 import {
 	categorySchema,
@@ -16,7 +17,8 @@ import {
 	messageDtoSchema,
 	type InboxItem,
 	type MessageDto,
-	type SyncResult
+	type SyncResult,
+	type ThreadNarrative
 } from '$lib/types/mail';
 
 const safeCategory = (raw: string | null) => {
@@ -38,6 +40,7 @@ function toInboxItem(row: typeof message.$inferSelect): InboxItem {
 		summary: row.summary,
 		priority: row.priority,
 		actionItems: row.actionItems ?? [],
+		facts: row.facts ?? null,
 		organizedAt: row.organizedAt,
 		organizeError: row.organizeError,
 		isDigested: row.isDigested
@@ -45,7 +48,12 @@ function toInboxItem(row: typeof message.$inferSelect): InboxItem {
 }
 
 function toMessageDto(row: typeof message.$inferSelect): MessageDto {
-	return { ...toInboxItem(row), bodyText: row.bodyText, labelIds: row.labelIds ?? [] };
+	return {
+		...toInboxItem(row),
+		bodyText: row.bodyText,
+		labelIds: row.labelIds ?? [],
+		spokenText: row.spokenText
+	};
 }
 
 async function ownedAccountIds(userId: string): Promise<string[]> {
@@ -125,7 +133,8 @@ export const connectGmail = command(async () => {
 		.values(values)
 		.onConflictDoUpdate({ target: [mailAccount.userId, mailAccount.gmailAddress], set: values });
 
-	void getInbox({}).refresh();
+	// queries are keyed by their arguments, so refresh what the client actually rendered
+	await requested(getInbox, 10).refreshAll();
 	return { address: user.email };
 });
 
@@ -184,8 +193,8 @@ export const syncMail = command(async (): Promise<SyncResult> => {
 		}
 	}
 
-	void getInbox({}).refresh();
-	void getDigest().refresh();
+	await requested(getInbox, 10).refreshAll();
+	await requested(getDigest, 10).refreshAll();
 	return result;
 });
 
@@ -230,7 +239,11 @@ export const getMessage = query(v.string(), async (id): Promise<MessageDto> => {
 		.from(message)
 		.where(and(eq(message.id, id), inArray(message.accountId, accountIds)));
 	if (!row) error(404, 'Message not found');
-	return toMessageDto(row);
+	const [{ count: threadCount }] = await db
+		.select({ count: count() })
+		.from(message)
+		.where(and(eq(message.accountId, row.accountId), eq(message.threadId, row.threadId)));
+	return { ...toMessageDto(row), threadCount };
 });
 
 /**
@@ -265,7 +278,8 @@ export const getDigest = query(async () => {
 				summary: row.summary,
 				priority: row.priority ?? 3,
 				receivedAt: row.receivedAt,
-				actionItems: row.actionItems
+				actionItems: row.actionItems,
+				facts: row.facts
 			})
 		)
 		.sort((a, b) => b.priority - a.priority || a.receivedAt.getTime() - b.receivedAt.getTime());
@@ -280,4 +294,98 @@ export const markDigested = command(v.string(), async (id: string) => {
 		.set({ isDigested: true })
 		.where(and(eq(message.id, id), inArray(message.accountId, accountIds)));
 	void getDigest().refresh();
+});
+
+type ThreadEntry = { from: string; receivedAt: Date; body: string };
+
+/** Live thread first (older mail predates the sync window), else what we synced. */
+async function threadEntries(
+	account: typeof mailAccount.$inferSelect,
+	target: typeof message.$inferSelect
+): Promise<ThreadEntry[]> {
+	try {
+		const messages = await gmailApi.getThread(await accessTokenFor(account), target.threadId);
+		return messages.map(gmailApi.parseMessage).map((parsed) => ({
+			from: parsed.fromEmail,
+			receivedAt: parsed.receivedAt,
+			body: parsed.bodyText
+		}));
+	} catch (error) {
+		console.log(`[organize] thread fetch failed, using synced rows: ${String(error)}`);
+		const rows = await db
+			.select()
+			.from(message)
+			.where(and(eq(message.accountId, target.accountId), eq(message.threadId, target.threadId)))
+			.orderBy(asc(message.receivedAt));
+		return rows.map((row) => ({
+			from: row.fromEmail,
+			receivedAt: row.receivedAt,
+			body: row.bodyText || row.subject
+		}));
+	}
+}
+
+/** One summary for the whole conversation — generated once, then cached per thread. */
+export const loadThreadSummary = command(v.string(), async (id: string) => {
+	const { user } = await requireUser();
+	const aiConfig = await getAiConfig(user.id);
+	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+
+	const target = await db
+		.select()
+		.from(message)
+		.where(eq(message.id, id))
+		.then((r) => r[0]);
+	if (!target) error(404, 'Message not found');
+	const account = await db
+		.select()
+		.from(mailAccount)
+		.where(eq(mailAccount.id, target.accountId))
+		.then((r) => r[0]);
+	if (!account || account.userId !== user.id) error(404, 'Message not found');
+
+	const [cached] = await db
+		.select()
+		.from(threadSummary)
+		.where(
+			and(
+				eq(threadSummary.accountId, target.accountId),
+				eq(threadSummary.threadId, target.threadId)
+			)
+		);
+	if (cached) {
+		return {
+			threadId: cached.threadId,
+			summary: cached.summary,
+			highlights: cached.highlights,
+			messageCount: cached.messageCount,
+			cached: true
+		};
+	}
+
+	const entries = await threadEntries(account, target);
+	if (entries.length === 0) error(400, 'No messages found in this conversation.');
+	const narrative: ThreadNarrative = await threadSummaryFor(
+		aiConfig,
+		entries.map((e) => ({ from: e.from, receivedAt: e.receivedAt.toISOString(), body: e.body }))
+	);
+
+	const values = {
+		accountId: target.accountId,
+		threadId: target.threadId,
+		summary: narrative.summary,
+		highlights: narrative.highlights,
+		messageCount: entries.length,
+		generatedAt: new Date()
+	};
+	await db
+		.insert(threadSummary)
+		.values(values)
+		.onConflictDoUpdate({
+			target: [threadSummary.accountId, threadSummary.threadId],
+			set: values
+		});
+
+	void getMessage(id).refresh();
+	return { threadId: target.threadId, ...narrative, messageCount: entries.length, cached: false };
 });

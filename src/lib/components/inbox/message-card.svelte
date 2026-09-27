@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { CATEGORY_LABELS, type InboxItem } from '$lib/types/mail';
+	import FactsChips from './facts-chips.svelte';
 
 	let {
 		item,
@@ -78,6 +79,7 @@
 			{:else}
 				<p class="mt-1.5 text-xs text-muted-foreground/70 italic">not organized yet</p>
 			{/if}
+			<FactsChips facts={item.facts} />
 		</div>
 	</div>
 </button>

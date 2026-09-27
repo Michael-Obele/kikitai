@@ -38,6 +38,7 @@
 		"cn": "^0.3.0",
 		"drizzle-kit": "^0.31.10",
 		"drizzle-orm": "^0.45.2",
+		"layerchart": "^2.0.0",
 		"mode-watcher": "^1.1.0",
 		"postgres": "^3.4.9",
 		"prettier": "^3.8.3",

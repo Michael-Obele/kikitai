@@ -106,6 +106,14 @@ export async function fetchMessages(
 	return out;
 }
 
+export type GmailThread = { id?: string; messages?: GmailMessage[] };
+
+/** The whole conversation — read-only `threads.get`, same scope as message calls. */
+export async function getThread(token: string, threadId: string): Promise<GmailMessage[]> {
+	const data = await request<GmailThread>(token, `/threads/${threadId}?format=full`);
+	return data.messages ?? [];
+}
+
 const decode = (data?: string) => (data ? Buffer.from(data, 'base64url').toString('utf8') : '');
 
 function walkParts(part: GmailPart, sink: GmailPart[]) {

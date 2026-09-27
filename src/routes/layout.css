@@ -9,72 +9,78 @@
 @plugin '@tailwindcss/typography';
 
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.147 0.004 49.25);
+	--background: oklch(0.985 0.003 90);
+	--foreground: oklch(0.19 0.02 285);
 	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.147 0.004 49.25);
+	--card-foreground: oklch(0.19 0.02 285);
 	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.147 0.004 49.25);
-	--primary: oklch(0.457 0.24 277.023);
-	--primary-foreground: oklch(0.962 0.018 272.314);
-	--secondary: oklch(0.967 0.001 286.375);
-	--secondary-foreground: oklch(0.21 0.006 285.885);
-	--muted: oklch(0.97 0.001 106.424);
-	--muted-foreground: oklch(0.553 0.013 58.071);
-	--accent: oklch(0.457 0.24 277.023);
-	--accent-foreground: oklch(0.962 0.018 272.314);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.923 0.003 48.717);
-	--input: oklch(0.923 0.003 48.717);
-	--ring: oklch(0.709 0.01 56.259);
-	--chart-1: oklch(0.879 0.169 91.605);
-	--chart-2: oklch(0.769 0.188 70.08);
-	--chart-3: oklch(0.666 0.179 58.318);
-	--chart-4: oklch(0.555 0.163 48.998);
-	--chart-5: oklch(0.473 0.137 46.201);
+	--popover-foreground: oklch(0.19 0.02 285);
+	--primary: oklch(0.48 0.27 288);
+	--primary-foreground: oklch(0.99 0.005 285);
+	--secondary: oklch(0.96 0.008 285);
+	--secondary-foreground: oklch(0.28 0.02 285);
+	--muted: oklch(0.965 0.006 285);
+	--muted-foreground: oklch(0.52 0.02 285);
+	--accent: oklch(0.95 0.022 288);
+	--accent-foreground: oklch(0.32 0.16 288);
+	--destructive: oklch(0.58 0.24 27);
+	--border: oklch(0.9 0.008 285);
+	--input: oklch(0.9 0.008 285);
+	--ring: oklch(0.48 0.27 288);
+	/* Signal is the urgency colour. Amber means "this one needs you" everywhere in the app. */
+	--signal: oklch(0.72 0.18 62);
+	--signal-foreground: oklch(0.25 0.06 62);
+	/* Chart hues map 1:1 to mail categories, in the order they appear in the app. */
+	--chart-1: oklch(0.72 0.18 62);
+	--chart-2: oklch(0.62 0.13 195);
+	--chart-3: oklch(0.55 0.24 300);
+	--chart-4: oklch(0.58 0.16 255);
+	--chart-5: oklch(0.68 0.02 285);
 	--radius: 0rem;
-	--sidebar: oklch(0.985 0.001 106.423);
-	--sidebar-foreground: oklch(0.147 0.004 49.25);
-	--sidebar-primary: oklch(0.511 0.262 276.966);
-	--sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-	--sidebar-accent: oklch(0.97 0.001 106.424);
-	--sidebar-accent-foreground: oklch(0.216 0.006 56.043);
-	--sidebar-border: oklch(0.923 0.003 48.717);
-	--sidebar-ring: oklch(0.709 0.01 56.259);
+	--sidebar: oklch(0.975 0.005 285);
+	--sidebar-foreground: oklch(0.19 0.02 285);
+	--sidebar-primary: oklch(0.48 0.27 288);
+	--sidebar-primary-foreground: oklch(0.99 0.005 285);
+	--sidebar-accent: oklch(0.95 0.022 288);
+	--sidebar-accent-foreground: oklch(0.32 0.16 288);
+	--sidebar-border: oklch(0.9 0.008 285);
+	--sidebar-ring: oklch(0.48 0.27 288);
 }
 
 .dark {
-	--background: oklch(0.147 0.004 49.25);
-	--foreground: oklch(0.985 0.001 106.423);
-	--card: oklch(0.216 0.006 56.043);
-	--card-foreground: oklch(0.985 0.001 106.423);
-	--popover: oklch(0.216 0.006 56.043);
-	--popover-foreground: oklch(0.985 0.001 106.423);
-	--primary: oklch(0.398 0.195 277.366);
-	--primary-foreground: oklch(0.962 0.018 272.314);
-	--secondary: oklch(0.274 0.006 286.033);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.268 0.007 34.298);
-	--muted-foreground: oklch(0.709 0.01 56.259);
-	--accent: oklch(0.398 0.195 277.366);
-	--accent-foreground: oklch(0.962 0.018 272.314);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.553 0.013 58.071);
-	--chart-1: oklch(0.879 0.169 91.605);
-	--chart-2: oklch(0.769 0.188 70.08);
-	--chart-3: oklch(0.666 0.179 58.318);
-	--chart-4: oklch(0.555 0.163 48.998);
-	--chart-5: oklch(0.473 0.137 46.201);
-	--sidebar: oklch(0.216 0.006 56.043);
-	--sidebar-foreground: oklch(0.985 0.001 106.423);
-	--sidebar-primary: oklch(0.585 0.233 277.117);
-	--sidebar-primary-foreground: oklch(0.962 0.018 272.314);
-	--sidebar-accent: oklch(0.268 0.007 34.298);
-	--sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.553 0.013 58.071);
+	--background: oklch(0.16 0.014 285);
+	--foreground: oklch(0.97 0.005 285);
+	--card: oklch(0.205 0.016 285);
+	--card-foreground: oklch(0.97 0.005 285);
+	--popover: oklch(0.205 0.016 285);
+	--popover-foreground: oklch(0.97 0.005 285);
+	--primary: oklch(0.68 0.2 288);
+	--primary-foreground: oklch(0.16 0.02 285);
+	--secondary: oklch(0.26 0.016 285);
+	--secondary-foreground: oklch(0.97 0.005 285);
+	--muted: oklch(0.26 0.016 285);
+	--muted-foreground: oklch(0.72 0.015 285);
+	--accent: oklch(0.3 0.05 288);
+	--accent-foreground: oklch(0.93 0.03 288);
+	--destructive: oklch(0.7 0.19 22);
+	--border: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 16%);
+	--ring: oklch(0.68 0.2 288);
+	--signal: oklch(0.78 0.16 65);
+	--signal-foreground: oklch(0.18 0.04 65);
+	--chart-1: oklch(0.78 0.16 65);
+	--chart-2: oklch(0.72 0.13 195);
+	--chart-3: oklch(0.68 0.21 300);
+	--chart-4: oklch(0.68 0.16 255);
+	--chart-5: oklch(0.6 0.02 285);
+	--sidebar: oklch(0.185 0.014 285);
+	--sidebar-foreground: oklch(0.97 0.005 285);
+	--sidebar-primary: oklch(0.68 0.2 288);
+	--sidebar-primary-foreground: oklch(0.16 0.02 285);
+	--sidebar-accent: oklch(0.3 0.05 288);
+	--sidebar-accent-foreground: oklch(0.93 0.03 288);
+	--sidebar-border: oklch(1 0 0 / 12%);
+	--sidebar-ring: oklch(0.68 0.2 288);
 }
 
 @theme inline {
@@ -111,6 +117,17 @@
 	--color-card: var(--card);
 	--color-foreground: var(--foreground);
 	--color-background: var(--background);
+	--color-signal: var(--signal);
+	--color-signal-foreground: var(--signal-foreground);
+
+	/* Display scale — the hero headline is the loudest thing on the page. */
+	--text-display: clamp(2.6rem, 7.5vw, 5.25rem);
+	--text-display--line-height: 0.95;
+	--text-display--letter-spacing: -0.03em;
+	--text-title: clamp(1.75rem, 3.6vw, 2.75rem);
+	--text-title--line-height: 1.05;
+	--text-title--letter-spacing: -0.02em;
+
 	--radius-sm: calc(var(--radius) * 0.6);
 	--radius-md: calc(var(--radius) * 0.8);
 	--radius-lg: var(--radius);

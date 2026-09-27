@@ -3,6 +3,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import Player from '$lib/components/player/player.svelte';
+	import FactsChips from '$lib/components/inbox/facts-chips.svelte';
 	import { getDigest, getSettings, markDigested } from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
 
@@ -73,6 +74,8 @@
 						<Player
 							engine={cfg.ttsEngine}
 							voice={cfg.ttsVoice}
+							speed={cfg.ttsSpeed}
+							ramp={cfg.ttsRamp}
 							{onPlayed}
 							items={items.map((item) => ({
 								id: item.id,
@@ -122,6 +125,7 @@
 									})}
 								</p>
 								<p class="mt-2 text-sm text-muted-foreground">{item.summary}</p>
+								<FactsChips facts={item.facts} />
 								{#if item.actionItems.length > 0}
 									<ul class="mt-2 space-y-1">
 										{#each item.actionItems as action, i (i)}

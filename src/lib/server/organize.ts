@@ -29,7 +29,10 @@ export async function organizePending(
 	let organized = 0;
 	let failed = 0;
 
+	console.log(`[organize] account=${accountId} pending=${pending.length}`);
+
 	for (const chunk of batch(pending, 10)) {
+		console.log(`[organize] batch of ${chunk.length}: ${chunk.map((m) => m.gmailId).join(', ')}`);
 		try {
 			const result = await organizeBatch(
 				aiConfig,
@@ -43,6 +46,7 @@ export async function organizePending(
 			for (const row of chunk) {
 				const classification = result.get(row.gmailId);
 				if (!classification) {
+					console.log(`[organize] no entry for ${row.gmailId} (${row.subject})`);
 					failed++;
 					await db
 						.update(message)
@@ -58,6 +62,7 @@ export async function organizePending(
 						summary: classification.summary,
 						priority: classification.priority,
 						actionItems: classification.actionItems,
+						facts: classification.facts,
 						organizedAt: new Date(),
 						organizeError: null
 					})
@@ -66,6 +71,7 @@ export async function organizePending(
 		} catch (error) {
 			failed += chunk.length;
 			const reason = error instanceof Error ? error.message : String(error);
+			console.log(`[organize] batch failed: ${reason}`);
 			for (const row of chunk) {
 				await db
 					.update(message)
