@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import { synthesize } from '$lib/remote';
+import { recordTts } from './telemetry';
 
 export type EngineId = 'kitten' | 'kokoro' | 'webspeech' | 'google' | 'minimax';
 
@@ -107,6 +108,11 @@ async function primeOnnxRuntime(): Promise<void> {
 	try {
 		const ort = await import(/* @vite-ignore */ ORT_MODULE);
 		ort.env.wasm.wasmPaths = ORT_DIST;
+		// Multi-threaded WASM needs cross-origin isolation (COOP/COEP). Without it
+		// ORT silently runs on ONE core — the main reason generation crawls.
+		if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) {
+			ort.env.wasm.numThreads = Math.max(1, navigator.hardwareConcurrency || 1);
+		}
 	} catch {
 		/* kitten's own import decides — same behaviour as before this fix */
 	}
@@ -127,18 +133,39 @@ type GeneratedAudio = {
 
 async function loadKitten() {
 	if (!kitten) {
+		const started = performance.now();
 		kitten = primeOnnxRuntime()
 			.then(() => import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kitten}`))
-			.then((mod: any) => mod.KittenTTS.from_pretrained(TTS_MODELS.kitten));
+			.then((mod: any) => mod.KittenTTS.from_pretrained(TTS_MODELS.kitten))
+			.then((model) => {
+				recordTts({
+					engine: 'kitten',
+					kind: 'load',
+					ms: performance.now() - started,
+					at: Date.now()
+				});
+				return model;
+			});
 	}
 	return kitten;
 }
 
 async function loadKokoro() {
 	if (!kokoro) {
-		kokoro = import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`).then((mod: any) =>
-			mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, { dtype: 'q8', device: 'wasm' })
-		);
+		const started = performance.now();
+		kokoro = import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`)
+			.then((mod: any) =>
+				mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, { dtype: 'q8', device: 'wasm' })
+			)
+			.then((model) => {
+				recordTts({
+					engine: 'kokoro',
+					kind: 'load',
+					ms: performance.now() - started,
+					at: Date.now()
+				});
+				return model;
+			});
 	}
 	return kokoro;
 }
@@ -253,6 +280,69 @@ function speakWithWebSpeech(text: string, voice: string, rate = DEFAULT_SPEED): 
 	});
 }
 
+export type PreparedSpeech = {
+	/** Milliseconds spent generating (≈0 when the engine synthesizes on the fly). */
+	genMs: number;
+	chars: number;
+	/** Plays the generated audio; resolves when the chunk has finished. */
+	play: () => Promise<void>;
+};
+
+/**
+ * Generate one chunk *without* playing it — the lookahead half of the player.
+ * Local engines are compute-bound, so the player prepares sentence N+1 while
+ * sentence N is still speaking: whenever `gen < play` the gaps disappear.
+ */
+export async function prepare(
+	engine: EngineId,
+	voice: string,
+	text: string,
+	speed: number = DEFAULT_SPEED
+): Promise<PreparedSpeech> {
+	stopped = false;
+	const clean = text.trim();
+	if (!clean) return { genMs: 0, chars: 0, play: async () => {} };
+
+	const started = performance.now();
+	let play: () => Promise<void>;
+
+	if (engine === 'webspeech') {
+		if (typeof speechSynthesis === 'undefined')
+			throw new Error('Web Speech is not available here.');
+		play = () => speakWithWebSpeech(clean, voice, speed);
+	} else if (engine === 'kitten' || engine === 'kokoro') {
+		const model = engine === 'kitten' ? await loadKitten() : await loadKokoro();
+		const generated = await model.generate(clean, {
+			voice: voice || ENGINES[engine].defaultVoice,
+			speed
+		});
+		play = async () => {
+			if (stopped) return;
+			await playBuffer(generated.toAudioBuffer(audioContext()));
+		};
+	} else {
+		const result = await synthesize({ text: clean, engine, voice });
+		play = async () => {
+			if (stopped) return;
+			await playBase64(result.audio, result.mime, speed);
+		};
+	}
+
+	const genMs = performance.now() - started;
+	recordTts({ engine, kind: 'gen', ms: genMs, chars: clean.length, at: Date.now() });
+	return { genMs, chars: clean.length, play };
+}
+
+/** Play a `prepare`d chunk, recording how long the audio actually took. */
+export async function playPrepared(engine: EngineId, prepared: PreparedSpeech): Promise<void> {
+	const started = performance.now();
+	try {
+		await prepared.play();
+	} finally {
+		recordTts({ engine, kind: 'play', ms: performance.now() - started, at: Date.now() });
+	}
+}
+
 /**
  * Speak one chunk of text with the chosen engine. Resolves when the chunk has
  * finished (or was stopped), so a playlist can advance to the next item.
@@ -264,51 +354,55 @@ export async function speak(
 	onError?: (message: string) => void,
 	speed: number = DEFAULT_SPEED
 ): Promise<void> {
-	stopped = false;
-	const clean = text.trim();
-	if (!clean) return;
-
 	try {
-		if (engine === 'webspeech') {
-			if (typeof speechSynthesis === 'undefined')
-				throw new Error('Web Speech is not available here.');
-			await speakWithWebSpeech(clean, voice, speed);
-			return;
-		}
-
-		if (engine === 'kitten') {
-			const model = await loadKitten();
-			const generated = await model.generate(clean, {
-				voice: voice || ENGINES.kitten.defaultVoice,
-				speed
-			});
-			if (!stopped) await playBuffer(generated.toAudioBuffer(audioContext()));
-			return;
-		}
-
-		if (engine === 'kokoro') {
-			const model = await loadKokoro();
-			const generated = await model.generate(clean, {
-				voice: voice || ENGINES.kokoro.defaultVoice,
-				speed
-			});
-			if (!stopped) await playBuffer(generated.toAudioBuffer(audioContext()));
-			return;
-		}
-
-		const result = await synthesize({ text: clean, engine, voice });
-		if (!stopped) await playBase64(result.audio, result.mime, speed);
+		await playPrepared(engine, await prepare(engine, voice, text, speed));
 	} catch (error) {
 		onError?.(error instanceof Error ? error.message : String(error));
 	}
 }
 
-/** Split text into speakable chunks — sentence level is enough for v1. */
+/** Anything longer than this stalls the first audio — split before speaking. */
+const MAX_CHUNK = 300;
+
+/** Split text into speakable chunks — sentence level, with long ones divided. */
 export function toSentences(text: string): string[] {
-	return (
-		text
-			.match(/[^.!?]+[.!?]*/g)
-			?.map((s) => s.trim())
-			.filter(Boolean) ?? [text]
-	);
+	const parts = text
+		.match(/[^.!?]+[.!?]*/g)
+		?.map((s) => s.trim())
+		.filter(Boolean) ?? [text];
+	return parts.flatMap((part) => (part.length <= MAX_CHUNK ? [part] : splitLong(part)));
+}
+
+/**
+ * Divide one oversized sentence at commas/colons, falling back to word
+ * boundaries — generation is per chunk, so a 2000-character "sentence" would
+ * keep the listener waiting for one very long inference.
+ */
+function splitLong(part: string): string[] {
+	// split with a capture keeps the delimiters at odd indices — rejoin them.
+	const pieces = part.split(/([,;:]\s+)/);
+	const segments: string[] = [];
+	for (let i = 0; i < pieces.length; i += 2) {
+		segments.push((pieces[i] ?? '') + (pieces[i + 1] ?? ''));
+	}
+
+	const out: string[] = [];
+	for (const segment of segments) {
+		if (segment.length <= MAX_CHUNK) {
+			if (segment.trim()) out.push(segment.trim());
+			continue;
+		}
+		let line = '';
+		for (const word of segment.split(/\s+/)) {
+			if (!word) continue;
+			if (line && line.length + 1 + word.length > MAX_CHUNK) {
+				out.push(line);
+				line = word;
+			} else {
+				line = line ? `${line} ${word}` : word;
+			}
+		}
+		if (line) out.push(line);
+	}
+	return out;
 }

@@ -14,4 +14,14 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	return svelteKitHandler({ event, resolve, auth, building });
 };
 
-export const handle: Handle = handleBetterAuth;
+export const handle: Handle = async (input) => {
+	// Cross-origin isolation (COOP + COEP) is what unlocks SharedArrayBuffer, and
+	// therefore ONNX Runtime's multi-threaded WASM — the single biggest lever on
+	// TTS generation time. `credentialless` keeps cross-origin CDN assets (the
+	// jsDelivr model modules, fonts) loading without needing a CORP header.
+	input.event.setHeaders({
+		'Cross-Origin-Opener-Policy': 'same-origin',
+		'Cross-Origin-Embedder-Policy': 'credentialless'
+	});
+	return handleBetterAuth(input);
+};

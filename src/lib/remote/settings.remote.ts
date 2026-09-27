@@ -5,9 +5,10 @@ import { requireUser } from '$lib/server/session';
 import {
 	getSettings as loadSettings,
 	saveSettings as persistSettings,
+	saveVoiceChoice as persistVoiceChoice,
 	saveVoiceSpeed as persistVoiceSpeed
 } from '$lib/server/settings';
-import { settingsFormSchema, type SettingsDto } from '$lib/types/mail';
+import { settingsFormSchema, ttsEngineSchema, type SettingsDto } from '$lib/types/mail';
 
 export const getSettings = query(async (): Promise<SettingsDto> => {
 	const { user } = await requireUser();
@@ -58,6 +59,19 @@ export const saveVoiceSpeed = command(
 	async ({ speed, ramp }) => {
 		const { user } = await requireUser();
 		await persistVoiceSpeed(user.id, speed, ramp);
+		void getSettings().refresh();
+	}
+);
+
+/**
+ * Engine/voice chosen on the public reader — synced for signed-in users;
+ * anonymous callers swallow the rejection and keep their localStorage copy.
+ */
+export const saveVoiceChoice = command(
+	v.object({ engine: ttsEngineSchema, voice: v.string() }),
+	async ({ engine, voice }) => {
+		const { user } = await requireUser();
+		await persistVoiceChoice(user.id, engine, voice);
 		void getSettings().refresh();
 	}
 );

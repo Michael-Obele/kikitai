@@ -12,16 +12,19 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { toast } from 'svelte-sonner';
+	import { PersistedState } from 'runed';
 	import { saveVoiceSpeed } from '$lib/remote';
 	import {
 		DEFAULT_SPEED,
 		ENGINES,
 		halt,
 		pausePlayback,
+		prepare,
+		playPrepared,
 		resumePlayback,
-		speak,
 		toSentences,
-		warmUp
+		warmUp,
+		type PreparedSpeech
 	} from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
 	import SpeedMenu from './speed-menu.svelte';
@@ -34,17 +37,17 @@
 		voice,
 		compact = false,
 		onPlayed,
-		speed = 1,
-		ramp = false
+		speed,
+		ramp
 	}: {
 		items: Item[];
 		engine: EngineId;
 		voice: string;
 		compact?: boolean;
 		onPlayed?: (id: string) => void;
-		/** Saved speed cap (settings.ttsSpeed). */
+		/** Server copy (settings.ttsSpeed) — omitted on the public /read page. */
 		speed?: number;
-		/** Saved auto-ramp flag (settings.ttsRamp). */
+		/** Server copy (settings.ttsRamp). */
 		ramp?: boolean;
 	} = $props();
 
@@ -61,21 +64,34 @@
 	let run = 0;
 	let pendingEngine = $state<EngineId | null>(null);
 
-	/** Cap + ramp mirrored from the props so menu edits win until a refresh lands. */
+	/** Remembered choice — works without an account (public /read) and offline. */
+	const prefs = new PersistedState('kikitai.player.prefs', { speed: 1, ramp: false });
+
+	/**
+	 * Cap + ramp. The first render matches the server (the remembered value
+	 * only exists client-side) — the effect below adopts it after mount.
+	 */
 	// svelte-ignore state_referenced_locally
-	let cap = $state(speed);
+	let cap = $state(speed ?? 1);
 	// svelte-ignore state_referenced_locally
-	let rampOn = $state(ramp);
+	let rampOn = $state(ramp ?? false);
 	/** What is actually playing: the cap, or the climbing value while ramping. */
 	let liveSpeed = $state(DEFAULT_SPEED);
 
 	const RAMP_MS = 120_000;
 
 	$effect(() => {
-		cap = speed;
+		if (speed !== undefined) cap = speed;
 	});
 	$effect(() => {
-		rampOn = ramp;
+		if (ramp !== undefined) rampOn = ramp;
+	});
+	$effect(() => {
+		// Signed out: adopt the remembered choice (it does not exist during SSR).
+		if (speed === undefined) {
+			cap = prefs.current.speed;
+			rampOn = prefs.current.ramp;
+		}
 	});
 	// No ramp ⇒ play at the cap; while ramping the timer below climbs.
 	$effect(() => {
@@ -93,6 +109,16 @@
 			}
 		}, 1000);
 		return () => clearInterval(id);
+	});
+
+	// Once the download has been accepted, load the model in the background so
+	// the first Play doesn't pay the load — it shows up in the telemetry card.
+	$effect(() => {
+		if (ENGINES[engine].downloadMb > 0 && localStorage.getItem(ackKey(engine))) {
+			void warmUp(engine).catch(() => {
+				/* offline or blocked — Play will retry it */
+			});
+		}
 	});
 
 	function ackKey(engineId: EngineId) {
@@ -124,10 +150,29 @@
 			if (run !== myRun) return;
 			index = i;
 			const parts = toSentences(items[i]!.text);
+			// Lookahead: sentence N+1 generates while N is speaking, so the ONNX
+			// work leaves the critical path whenever generation beats playback.
+			let pending: Promise<PreparedSpeech> | null = tracked(
+				prepare(engine, voice, parts[0]!, liveSpeed)
+			);
 			for (let s = 0; s < parts.length; s++) {
 				if (run !== myRun) return;
 				sentenceIndex = s;
-				await speak(engine, voice, parts[s]!, (message) => toast.error(message), liveSpeed);
+				let prepared: PreparedSpeech;
+				try {
+					prepared = await pending!;
+				} catch (error) {
+					toast.error(error instanceof Error ? error.message : String(error));
+					return;
+				}
+				if (run !== myRun) return;
+				pending =
+					s + 1 < parts.length ? tracked(prepare(engine, voice, parts[s + 1]!, liveSpeed)) : null;
+				try {
+					await playPrepared(engine, prepared);
+				} catch (error) {
+					toast.error(error instanceof Error ? error.message : String(error));
+				}
 				if (run !== myRun) return;
 			}
 			onPlayed?.(items[i]!.id);
@@ -140,8 +185,9 @@
 	}
 
 	function persist(next: { speed: number; ramp: boolean }) {
+		prefs.current = next; // everyone — survives a reload without an account
 		void saveVoiceSpeed(next).catch(() => {
-			/* signed out (public /read) — keep it session-local */
+			/* signed out (public /read) — the local copy is the source of truth */
 		});
 	}
 
@@ -191,6 +237,12 @@
 		void start(index);
 	}
 
+	/** A prefetch nobody awaits any more must not raise an unhandled rejection. */
+	function tracked(promise: Promise<PreparedSpeech>) {
+		promise.catch(() => {});
+		return promise;
+	}
+
 	$effect(() => {
 		return () => {
 			run++;
@@ -218,8 +270,8 @@
 		</div>
 	{/if}
 
-	<div class="flex items-center gap-1.5 {compact ? '' : 'justify-between'}">
-		<div class="flex items-center gap-1.5">
+	<div class="flex items-center gap-3 {compact ? '' : 'justify-between'}">
+		<div class="flex items-center gap-3 space-x-3">
 			<Button
 				variant={playing ? 'secondary' : 'default'}
 				size={compact ? 'icon-sm' : 'default'}
@@ -265,7 +317,7 @@
 		</div>
 
 		{#if compact}
-			<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+			<span class="flex items-center gap-3 text-xs text-muted-foreground">
 				<AudioLines class="size-3.5 {playing ? 'text-primary' : ''}" />
 				{ENGINES[engine].label}
 			</span>
