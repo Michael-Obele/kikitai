@@ -82,6 +82,9 @@ export const message = pgTable(
 		/** Spoken rewrite of a long body — cached after the first play. */
 		spokenText: text('spoken_text'),
 		spokenAt: timestamp('spoken_at'),
+		/** AI-cleaned body (links dropped, prose flowing) — cached on first open. */
+		cleanBody: text('clean_body'),
+		cleanedAt: timestamp('cleaned_at'),
 		isDigested: boolean('is_digested').notNull().default(false),
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},

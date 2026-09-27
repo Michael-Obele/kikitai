@@ -10,6 +10,7 @@ import { organizePending } from '$lib/server/organize';
 import { getAiConfig } from '$lib/server/settings';
 import type { MessageDetails } from '$lib/types/mail';
 import { getInbox, getDigest, getMessage } from './mail.remote';
+import { cleanedBody } from '$lib/server/clean-body';
 
 /** The caller's own message — 404 otherwise (IDOR guard, same rule everywhere). */
 async function ownedMessage(userId: string, id: string) {
@@ -118,11 +119,14 @@ export const loadListenScript = command(v.string(), async (id: string) => {
 	const target = await ownedMessage(user.id, id);
 	if (target.spokenText) return { id, spokenText: target.spokenText, cached: true };
 
+	// The cleanup has already run by the time this button exists — feed the
+	// cleaned body in, so the model never strips the same furniture twice.
+	const cleaned = await cleanedBody(target, user.id).catch(() => null);
 	const spokenText = await listenScriptFor(aiConfig, {
 		gmailId: target.gmailId,
 		subject: target.subject,
 		from: target.fromEmail,
-		body: target.bodyText || target.subject
+		body: (cleaned ?? target.bodyText) || target.subject
 	});
 	await db
 		.update(message)

@@ -67,6 +67,8 @@ export const messageDtoSchema = v.object({
 	facts: v.nullable(factsSchema),
 	/** TTS-friendly rewrite of a long body — omitted from the list view. */
 	spokenText: v.nullable(v.string()),
+	/** AI-cleaned body: no URLs, no hard wrapping — reads and speaks cleanly. */
+	cleanBody: v.nullable(v.string()),
 	/** Messages in this conversation (local sync); only `getMessage` fills it. */
 	threadCount: v.optional(v.number()),
 	organizedAt: v.nullable(v.date()),
@@ -76,7 +78,12 @@ export const messageDtoSchema = v.object({
 export type MessageDto = v.InferOutput<typeof messageDtoSchema>;
 
 /** List view — no bodies, so an inbox page stays light. */
-export const inboxItemSchema = v.omit(messageDtoSchema, ['bodyText', 'labelIds', 'spokenText']);
+export const inboxItemSchema = v.omit(messageDtoSchema, [
+	'bodyText',
+	'labelIds',
+	'spokenText',
+	'cleanBody'
+]);
 export type InboxItem = v.InferOutput<typeof inboxItemSchema>;
 
 export const TTS_ENGINES = ['kitten', 'kokoro', 'webspeech', 'google', 'minimax'] as const;

@@ -44,6 +44,7 @@
 	} = $props();
 
 	let reorganizing = $state(false);
+	let showOriginal = $state(false);
 	let details = $state<MessageDetails | null>(null);
 	let thread = $state<{ summary: string; highlights: string[]; messageCount: number } | null>(null);
 	let spokenText = $state<string | null>(null);
@@ -57,6 +58,7 @@
 		details = null;
 		thread = null;
 		spokenText = null;
+		showOriginal = false;
 		loadingDetails = false;
 		loadingThread = false;
 		loadingSpoken = false;
@@ -171,15 +173,37 @@
 
 	{#await getMessage(item.id)}
 		<div class="flex items-center gap-2 text-sm text-muted-foreground">
-			<LoaderCircle class="size-4 animate-spin" /> Loading message…
+			<LoaderCircle class="size-4 animate-spin" /> Cleaning this message with AI — the first open of a
+			message takes about ten seconds…
 		</div>
 	{:then full}
 		{@const spoken = spokenText ?? full.spokenText}
+		{@const body = showOriginal || !full.cleanBody ? full.bodyText : full.cleanBody}
 		{#if full.bodyText}
+			{#if full.cleanBody}
+				<div class="flex items-center justify-between gap-2">
+					<p class="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+						<WandSparkles class="size-3 shrink-0 text-primary" />
+						<span class="tracking-widest uppercase">AI rewrite</span>
+						<span class="truncate text-muted-foreground/60">
+							— links, markdown and mailing-list furniture removed
+						</span>
+					</p>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="h-6 shrink-0 px-2 text-xs"
+						aria-pressed={showOriginal}
+						onclick={() => (showOriginal = !showOriginal)}
+					>
+						{showOriginal ? 'Show AI rewrite' : 'Show original'}
+					</Button>
+				</div>
+			{/if}
 			<div
 				class="max-h-64 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground"
 			>
-				{full.bodyText}
+				{body}
 			</div>
 		{:else}
 			<p class="text-sm text-muted-foreground italic">
@@ -239,7 +263,10 @@
 							title: item.subject,
 							text:
 								spoken ??
-								[item.summary ?? '', full.bodyText].filter(Boolean).join('\n\n').slice(0, 2000)
+								[item.summary ?? '', full.cleanBody ?? full.bodyText]
+									.filter(Boolean)
+									.join('\n\n')
+									.slice(0, 2000)
 						}
 					]}
 				/>

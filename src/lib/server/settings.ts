@@ -86,9 +86,31 @@ export async function saveVoiceSpeed(userId: string, speed: number, ramp: boolea
 		});
 }
 
+/** Engine + voice picked on the public reader — the signed-in twin of saveVoiceSpeed. */
+export async function saveVoiceChoice(
+	userId: string,
+	engine: TtsEngine,
+	voice: string
+): Promise<void> {
+	await db
+		.insert(settings)
+		.values({ userId, ttsEngine: engine, ttsVoice: voice })
+		.onConflictDoUpdate({
+			target: settings.userId,
+			set: { ttsEngine: engine, ttsVoice: voice, updatedAt: new Date() }
+		});
+}
+
 /** Config the AI pipeline uses. `null` when no endpoint is configured. */
 export async function getAiConfig(userId: string): Promise<AiConfig | null> {
 	const s = await getSettings(userId);
 	if (!s.aiBaseUrl || !s.aiModel) return null;
-	return { baseUrl: s.aiBaseUrl, apiKey: s.aiKey ?? '', model: s.aiModel };
+	// AI_THINKING=disabled keeps DeepSeek-flash out of its reasoning mode.
+	const thinking = env.AI_THINKING?.trim().toLowerCase();
+	return {
+		baseUrl: s.aiBaseUrl,
+		apiKey: s.aiKey ?? '',
+		model: s.aiModel,
+		thinking: thinking === 'enabled' || thinking === 'disabled' ? thinking : undefined
+	};
 }

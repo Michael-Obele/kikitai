@@ -9,6 +9,7 @@ import * as gmailApi from '$lib/server/gmail';
 import { decrypt, encrypt } from '$lib/server/tokens';
 import { getAiConfig, getSettings } from '$lib/server/settings';
 import { threadSummaryFor } from '$lib/server/ai';
+import { cleanedBody } from '$lib/server/clean-body';
 import { organizePending } from '$lib/server/organize';
 import {
 	categorySchema,
@@ -52,7 +53,8 @@ function toMessageDto(row: typeof message.$inferSelect): MessageDto {
 		...toInboxItem(row),
 		bodyText: row.bodyText,
 		labelIds: row.labelIds ?? [],
-		spokenText: row.spokenText
+		spokenText: row.spokenText,
+		cleanBody: row.cleanBody
 	};
 }
 
@@ -239,11 +241,13 @@ export const getMessage = query(v.string(), async (id): Promise<MessageDto> => {
 		.from(message)
 		.where(and(eq(message.id, id), inArray(message.accountId, accountIds)));
 	if (!row) error(404, 'Message not found');
+	// First open pays one AI call; every later open is a column read.
+	const cleanBody = (await cleanedBody(row, user.id).catch(() => null)) ?? row.cleanBody;
 	const [{ count: threadCount }] = await db
 		.select({ count: count() })
 		.from(message)
 		.where(and(eq(message.accountId, row.accountId), eq(message.threadId, row.threadId)));
-	return { ...toMessageDto(row), threadCount };
+	return { ...toMessageDto({ ...row, cleanBody }), threadCount };
 });
 
 /**
