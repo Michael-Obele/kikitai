@@ -31,7 +31,7 @@
 
 <Sidebar.Root>
 	<Sidebar.Header>
-		<div class="flex items-center gap-2 px-1 py-1.5">
+		<a href="/" class="flex items-center gap-2 px-1 py-1.5">
 			<span class="grid size-7 place-items-center bg-primary text-primary-foreground">
 				<AudioLines class="size-4" />
 			</span>
@@ -39,7 +39,7 @@
 				<span class="font-heading text-base italic">Kikitai</span>
 				<span class="text-[10px] tracking-widest text-muted-foreground">聞きたい</span>
 			</div>
-		</div>
+		</a>
 	</Sidebar.Header>
 
 	<Sidebar.Content>

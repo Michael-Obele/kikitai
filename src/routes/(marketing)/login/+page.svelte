@@ -25,7 +25,7 @@
 	<title>Sign in · Kikitai</title>
 </svelte:head>
 
-<div class="grid min-h-svh place-items-center bg-muted/40 px-4 py-10">
+<div class="grid flex-1 place-items-center bg-muted/40 px-4 py-10">
 	<div class="w-full max-w-sm">
 		<div class="mb-6 flex flex-col items-center text-center">
 			<span class="grid size-9 place-items-center bg-primary text-primary-foreground">
