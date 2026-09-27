@@ -12,7 +12,9 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { toast } from 'svelte-sonner';
+	import { saveVoiceSpeed } from '$lib/remote';
 	import {
+		DEFAULT_SPEED,
 		ENGINES,
 		halt,
 		pausePlayback,
@@ -22,6 +24,7 @@
 		warmUp
 	} from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
+	import SpeedMenu from './speed-menu.svelte';
 
 	type Item = { id: string; text: string; title?: string };
 
@@ -30,13 +33,19 @@
 		engine,
 		voice,
 		compact = false,
-		onPlayed
+		onPlayed,
+		speed = 1,
+		ramp = false
 	}: {
 		items: Item[];
 		engine: EngineId;
 		voice: string;
 		compact?: boolean;
 		onPlayed?: (id: string) => void;
+		/** Saved speed cap (settings.ttsSpeed). */
+		speed?: number;
+		/** Saved auto-ramp flag (settings.ttsRamp). */
+		ramp?: boolean;
 	} = $props();
 
 	let index = $state(0);
@@ -51,6 +60,40 @@
 	/** Generation counter — any stale loop bails out as soon as it changes. */
 	let run = 0;
 	let pendingEngine = $state<EngineId | null>(null);
+
+	/** Cap + ramp mirrored from the props so menu edits win until a refresh lands. */
+	// svelte-ignore state_referenced_locally
+	let cap = $state(speed);
+	// svelte-ignore state_referenced_locally
+	let rampOn = $state(ramp);
+	/** What is actually playing: the cap, or the climbing value while ramping. */
+	let liveSpeed = $state(DEFAULT_SPEED);
+
+	const RAMP_MS = 120_000;
+
+	$effect(() => {
+		cap = speed;
+	});
+	$effect(() => {
+		rampOn = ramp;
+	});
+	// No ramp ⇒ play at the cap; while ramping the timer below climbs.
+	$effect(() => {
+		if (!rampOn) liveSpeed = cap;
+	});
+	// +0.1× every 2 minutes of *playing* time — paused time never counts.
+	$effect(() => {
+		if (!rampOn || status !== 'playing') return;
+		let last = performance.now();
+		const id = setInterval(() => {
+			const now = performance.now();
+			if (now - last >= RAMP_MS) {
+				last = now;
+				liveSpeed = Math.min(Math.round((liveSpeed + 0.1) * 10) / 10, cap);
+			}
+		}, 1000);
+		return () => clearInterval(id);
+	});
 
 	function ackKey(engineId: EngineId) {
 		return `kikitai-tts-ack:${engineId}`;
@@ -84,7 +127,7 @@
 			for (let s = 0; s < parts.length; s++) {
 				if (run !== myRun) return;
 				sentenceIndex = s;
-				await speak(engine, voice, parts[s]!, (message) => toast.error(message));
+				await speak(engine, voice, parts[s]!, (message) => toast.error(message), liveSpeed);
 				if (run !== myRun) return;
 			}
 			onPlayed?.(items[i]!.id);
@@ -94,6 +137,25 @@
 			index = 0;
 			sentenceIndex = 0;
 		}
+	}
+
+	function persist(next: { speed: number; ramp: boolean }) {
+		void saveVoiceSpeed(next).catch(() => {
+			/* signed out (public /read) — keep it session-local */
+		});
+	}
+
+	function selectSpeed(next: number) {
+		cap = next;
+		liveSpeed = rampOn ? Math.min(liveSpeed, next) : next;
+		persist({ speed: next, ramp: rampOn });
+	}
+
+	function setRamp(next: boolean) {
+		rampOn = next;
+		// Ramp climbs toward the cap: start at 1.0 (never above the cap).
+		liveSpeed = next ? Math.min(1, cap) : cap;
+		persist({ speed: cap, ramp: next });
 	}
 
 	function toggle() {
@@ -192,6 +254,8 @@
 					<SkipForward class="size-4" />
 				</Button>
 			{/if}
+
+			<SpeedMenu {cap} ramp={rampOn} live={liveSpeed} onselect={selectSpeed} ontoggle={setRamp} />
 
 			{#if status !== 'idle'}
 				<Button variant="ghost" size="icon-sm" aria-label="Stop" onclick={stop}>
