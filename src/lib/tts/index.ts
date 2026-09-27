@@ -24,8 +24,8 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 	kitten: {
 		id: 'kitten',
 		label: 'Kitten (default)',
-		note: 'Tiny local model, Apache-2.0. ~24MB once, then offline forever.',
-		downloadMb: 24,
+		note: 'Tiny local model, Apache-2.0. ~57MB once, then offline forever.',
+		downloadMb: 57,
 		local: true,
 		voices: ['Luna', 'Bella', 'Rosie', 'Kiki', 'Leo', 'Jasper', 'Bruno', 'Hugo'],
 		defaultVoice: 'Luna'
@@ -73,13 +73,50 @@ const TTS_MODELS = {
 	kokoro: 'onnx-community/Kokoro-82M-v1.0-ONNX'
 } as const;
 
-const cdn = () => (env.PUBLIC_TTS_CDN || 'https://esm.sh').replace(/\/$/, '');
+/** Fixed speed steps offered in the UI (multiplier over natural speech). */
+export const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3] as const;
+export const DEFAULT_SPEED = 1;
+
+/**
+ * Package paths appended to the CDN base. The `/+esm` suffix asks jsDelivr for
+ * its browser-condition build: plain esm.sh injects an unenv `process` shim
+ * (`versions.node = "22.14.0"`), so the loaders take their Node branch and die
+ * on `fs.mkdirSync` — "[unenv] fs.mkdirSync is not implemented yet!".
+ */
+const TTS_MODULES = {
+	kitten: 'kitten-tts-js@0.1.2/+esm',
+	kokoro: 'kokoro-js@1.2.1/+esm'
+} as const;
+
+/** Base URL of an npm CDN serving `<base>/<package>/+esm` (jsDelivr-style). */
+const cdn = () => (env.PUBLIC_TTS_CDN || 'https://cdn.jsdelivr.net/npm').replace(/\/$/, '');
+
+/**
+ * kitten's jsDelivr build derives `ort.env.wasm.wasmPaths` from its own
+ * immutable npm path (`…/kitten-tts-js@0.1.2/src/`), which ships no ONNX
+ * Runtime files → 404 on `ort-wasm-simd-threaded.jsep.mjs` → "no available
+ * backend found". It only assigns that value when unset, and jsDelivr rewrites
+ * its bare `onnxruntime-web` import to this exact URL — so import it first and
+ * point `wasmPaths` at the package's real `dist/` (a URL prefix, per ONNX
+ * Runtime's `Env.WebAssemblyFlags.wasmPaths`).
+ */
+const ORT_MODULE: string = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/+esm';
+const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/dist/';
+
+async function primeOnnxRuntime(): Promise<void> {
+	try {
+		const ort = await import(/* @vite-ignore */ ORT_MODULE);
+		ort.env.wasm.wasmPaths = ORT_DIST;
+	} catch {
+		/* kitten's own import decides — same behaviour as before this fix */
+	}
+}
 
 let kitten: Promise<{
-	generate: (text: string, opts?: { voice?: string }) => Promise<GeneratedAudio>;
+	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
 }> | null = null;
 let kokoro: Promise<{
-	generate: (text: string, opts?: { voice?: string }) => Promise<GeneratedAudio>;
+	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
 }> | null = null;
 
 type GeneratedAudio = {
@@ -90,16 +127,16 @@ type GeneratedAudio = {
 
 async function loadKitten() {
 	if (!kitten) {
-		kitten = import(/* @vite-ignore */ `${cdn()}/kitten-tts-js`).then((mod: any) =>
-			mod.KittenTTS.from_pretrained(TTS_MODELS.kitten)
-		);
+		kitten = primeOnnxRuntime()
+			.then(() => import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kitten}`))
+			.then((mod: any) => mod.KittenTTS.from_pretrained(TTS_MODELS.kitten));
 	}
 	return kitten;
 }
 
 async function loadKokoro() {
 	if (!kokoro) {
-		kokoro = import(/* @vite-ignore */ `${cdn()}/kokoro-js`).then((mod: any) =>
+		kokoro = import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`).then((mod: any) =>
 			mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, { dtype: 'q8', device: 'wasm' })
 		);
 	}
@@ -177,11 +214,15 @@ function playBuffer(buffer: AudioBuffer): Promise<void> {
 	});
 }
 
-function playBase64(audio: string, mime: string): Promise<void> {
+function playBase64(audio: string, mime: string, speed = DEFAULT_SPEED): Promise<void> {
 	return new Promise((done, fail) => {
 		const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
 		const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
 		const el = new Audio(url);
+		if (speed !== 1) {
+			el.playbackRate = speed;
+			if ('preservesPitch' in el) el.preservesPitch = true;
+		}
 		audioEl = el;
 		el.onended = () => {
 			URL.revokeObjectURL(url);
@@ -197,13 +238,14 @@ function playBase64(audio: string, mime: string): Promise<void> {
 	});
 }
 
-function speakWithWebSpeech(text: string, voice: string): Promise<void> {
+function speakWithWebSpeech(text: string, voice: string, rate = DEFAULT_SPEED): Promise<void> {
 	return new Promise((done) => {
 		const utterance = new SpeechSynthesisUtterance(text);
 		const voices = speechSynthesis.getVoices();
 		const match =
 			voices.find((v) => v.name === voice) ?? voices.find((v) => v.lang.startsWith('en'));
 		if (match) utterance.voice = match;
+		utterance.rate = rate;
 		utterance.onend = () => done();
 		utterance.onerror = () => done();
 		speechSynthesis.speak(utterance);
@@ -219,7 +261,8 @@ export async function speak(
 	engine: EngineId,
 	voice: string,
 	text: string,
-	onError?: (message: string) => void
+	onError?: (message: string) => void,
+	speed: number = DEFAULT_SPEED
 ): Promise<void> {
 	stopped = false;
 	const clean = text.trim();
@@ -229,14 +272,15 @@ export async function speak(
 		if (engine === 'webspeech') {
 			if (typeof speechSynthesis === 'undefined')
 				throw new Error('Web Speech is not available here.');
-			await speakWithWebSpeech(clean, voice);
+			await speakWithWebSpeech(clean, voice, speed);
 			return;
 		}
 
 		if (engine === 'kitten') {
 			const model = await loadKitten();
 			const generated = await model.generate(clean, {
-				voice: voice || ENGINES.kitten.defaultVoice
+				voice: voice || ENGINES.kitten.defaultVoice,
+				speed
 			});
 			if (!stopped) await playBuffer(generated.toAudioBuffer(audioContext()));
 			return;
@@ -245,14 +289,15 @@ export async function speak(
 		if (engine === 'kokoro') {
 			const model = await loadKokoro();
 			const generated = await model.generate(clean, {
-				voice: voice || ENGINES.kokoro.defaultVoice
+				voice: voice || ENGINES.kokoro.defaultVoice,
+				speed
 			});
 			if (!stopped) await playBuffer(generated.toAudioBuffer(audioContext()));
 			return;
 		}
 
 		const result = await synthesize({ text: clean, engine, voice });
-		if (!stopped) await playBase64(result.audio, result.mime);
+		if (!stopped) await playBase64(result.audio, result.mime, speed);
 	} catch (error) {
 		onError?.(error instanceof Error ? error.message : String(error));
 	}
