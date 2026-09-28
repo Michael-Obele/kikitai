@@ -131,6 +131,18 @@
 		}
 	});
 
+	/**
+	 * ONNX Runtime reports memory trouble as "no available backend found … out of
+	 * memory", which tells the reader nothing. Say what broke and what to do.
+	 */
+	function loadErrorHint(error: unknown): string {
+		const message = error instanceof Error ? error.message : String(error);
+		if (/out of memory|no available backend|Aborted/i.test(message)) {
+			return 'The voice model ran out of memory. Close a few tabs and press Play again — or switch to Web Speech.';
+		}
+		return message || 'Could not load the voice model.';
+	}
+
 	function ackKey(engineId: EngineId) {
 		return `kikitai-tts-ack:${engineId}`;
 	}
@@ -150,7 +162,7 @@
 			await warmUp(engine);
 		} catch (error) {
 			if (run === myRun) status = 'idle';
-			toast.error(error instanceof Error ? error.message : 'Could not load the voice model.');
+			toast.error(loadErrorHint(error));
 			return;
 		}
 		if (run !== myRun) return;

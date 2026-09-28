@@ -132,6 +132,8 @@ async function primeOnnxRuntime(): Promise<void> {
 
 let kitten: Promise<{
 	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
+	/** Frees the ONNX session — kitten's README calls this out for model switching. */
+	release?: () => void;
 }> | null = null;
 let kokoro: Promise<{
 	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
@@ -205,6 +207,17 @@ async function loadKokoro() {
 					gpu ? { dtype: 'fp32', device: 'webgpu' } : { dtype: 'q8', device: 'wasm' }
 				)
 			)
+			.catch(async (error: unknown) => {
+				// 310MB of fp32 does not fit in every browser's WASM heap — drop to the
+				// 90MB build rather than leaving the player dead with "no available backend".
+				if (!gpu || !/out of memory|no available backend|Aborted/i.test(String(error))) throw error;
+				console.warn('[tts] fp32/WebGPU would not load — retrying the 90MB WASM build', error);
+				const mod: any = await import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`);
+				return mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, {
+					dtype: 'q8',
+					device: 'wasm'
+				});
+			})
 			.then((model) => {
 				recordTts({
 					engine: 'kokoro',
@@ -219,8 +232,39 @@ async function loadKokoro() {
 	return kokoro;
 }
 
-/** Prepare a local engine ahead of time (shows the download notice first). */
+/**
+ * One model in memory at a time. Switching engines used to keep both ONNX
+ * sessions alive — kitten's session plus kokoro's fp32 weights (310MB on disk,
+ * roughly 1GB resident) across two separate ONNX runtimes — and the WASM heap
+ * died on smaller machines with `no available backend found … out of memory`.
+ * A reload only hid it, because a reload resets the heaps.
+ */
+async function releaseOther(current: EngineId): Promise<void> {
+	if (current === 'kitten') {
+		const pending = kokoro;
+		kokoro = null;
+		if (!pending) return;
+		try {
+			// kokoro-js exposes no release: dropping the last reference is the free.
+			await (pending as Promise<{ dispose?: () => void }>).then((m) => m.dispose?.());
+		} catch {
+			/* session already gone */
+		}
+		return;
+	}
+	const pending = kitten;
+	kitten = null;
+	if (!pending) return;
+	try {
+		(await pending).release?.();
+	} catch {
+		/* session already gone */
+	}
+}
+
 export async function warmUp(engine: EngineId): Promise<void> {
+	// Free the engine we're leaving *before* the next one allocates its heap.
+	await releaseOther(engine);
 	if (engine === 'kitten') await loadKitten();
 	else if (engine === 'kokoro') await loadKokoro();
 }
