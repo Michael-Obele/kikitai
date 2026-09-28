@@ -26,6 +26,7 @@
 	import type { InboxItem, MessageDetails, MessageDto } from '$lib/types/mail';
 	import type { EngineId } from '$lib/tts';
 	import VoicePicker from '$lib/components/player/voice-picker.svelte';
+	import TelemetryCard from '$lib/components/player/telemetry-card.svelte';
 	import WordLine from '$lib/components/player/word-line.svelte';
 
 	let {
@@ -344,6 +345,8 @@
 				<WordLine text={pointer.text} word={pointer.word} />
 			</p>
 		{/if}
+
+		<TelemetryCard {engine} class="mt-3" />
 	{:catch error}
 		<p class="text-sm text-destructive">{errorMessage(error)}</p>
 	{/await}
