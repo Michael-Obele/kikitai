@@ -26,6 +26,7 @@
 	import type { InboxItem, MessageDetails, MessageDto } from '$lib/types/mail';
 	import type { EngineId } from '$lib/tts';
 	import VoicePicker from '$lib/components/player/voice-picker.svelte';
+	import WordLine from '$lib/components/player/word-line.svelte';
 
 	let {
 		item,
@@ -55,6 +56,8 @@
 	let showOriginal = $state(false);
 	let simplified = $state<string | null>(null);
 	let simplifying = $state(false);
+	/** Live position inside the spoken chunk — drives the now-speaking line. */
+	let pointer = $state<{ chunk: number; word: number; text: string } | null>(null);
 	let details = $state<MessageDetails | null>(null);
 	let thread = $state<{ summary: string; highlights: string[]; messageCount: number } | null>(null);
 	let spokenText = $state<string | null>(null);
@@ -71,6 +74,7 @@
 		showOriginal = false;
 		simplified = null;
 		simplifying = false;
+		pointer = null;
 		loadingDetails = false;
 		loadingThread = false;
 		loadingSpoken = false;
@@ -306,6 +310,7 @@
 			<div class="min-w-0 flex-1">
 				<Player
 					compact
+					bind:pointer
 					{engine}
 					{voice}
 					{speed}
@@ -334,6 +339,11 @@
 				</Button>
 			{/if}
 		</div>
+		{#if pointer}
+			<p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+				<WordLine text={pointer.text} word={pointer.word} />
+			</p>
+		{/if}
 	{:catch error}
 		<p class="text-sm text-destructive">{errorMessage(error)}</p>
 	{/await}

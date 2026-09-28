@@ -30,6 +30,7 @@
 	} from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
 	import { recordTts, sessionId } from '$lib/tts/telemetry';
+	import WordLine from './word-line.svelte';
 	import SpeedMenu from './speed-menu.svelte';
 
 	type Item = { id: string; text: string; title?: string };
@@ -41,7 +42,8 @@
 		compact = false,
 		onPlayed,
 		speed,
-		ramp
+		ramp,
+		pointer = $bindable<{ chunk: number; word: number; text: string } | null>(null)
 	}: {
 		items: Item[];
 		engine: EngineId;
@@ -52,10 +54,14 @@
 		speed?: number;
 		/** Server copy (settings.ttsRamp). */
 		ramp?: boolean;
+		/** Live position in the spoken text, so a compact host can render its own line. */
+		pointer?: { chunk: number; word: number; text: string } | null;
 	} = $props();
 
 	let index = $state(0);
 	let sentenceIndex = $state(0);
+	/** The paragraph the reader view draws its chunks into — used to keep the spoken one in view. */
+	let chunkList = $state<HTMLElement | null>(null);
 	let status = $state<'idle' | 'loading' | 'playing' | 'paused'>('idle');
 	let noticeOpen = $state(false);
 
@@ -188,10 +194,13 @@
 						at: Date.now()
 					});
 				}
+				const stopTracking = track(s, parts[s]!, prepared.audioMs, performance.now());
 				try {
 					await playPrepared(engine, prepared);
 				} catch (error) {
 					toast.error(error instanceof Error ? error.message : String(error));
+				} finally {
+					stopTracking();
 				}
 				if (run !== myRun) return;
 			}
@@ -201,6 +210,7 @@
 			status = 'idle';
 			index = 0;
 			sentenceIndex = 0;
+			pointer = null;
 		}
 	}
 
@@ -241,7 +251,47 @@
 		halt();
 		status = 'idle';
 		sentenceIndex = 0;
+		pointer = null;
 	}
+
+	/**
+	 * Follows the chunk being spoken frame by frame so the reader can light up the
+	 * current word. Paused time never counts against the chunk's duration.
+	 */
+	function track(chunk: number, text: string, audioMs: number, beganAt: number) {
+		const total = text.split(/\s+/).filter(Boolean).length || 1;
+		let pausedAt = 0;
+		let pausedTotal = 0;
+		let frame = 0;
+		const step = () => {
+			const now = performance.now();
+			if (status === 'playing') {
+				if (pausedAt) {
+					pausedTotal += now - pausedAt;
+					pausedAt = 0;
+				}
+				const ratio = Math.min(1, (now - beganAt - pausedTotal) / Math.max(1, audioMs));
+				pointer = { chunk, text, word: Math.min(total - 1, Math.floor(ratio * total)) };
+			} else if (status === 'paused' && !pausedAt) {
+				pausedAt = now;
+			} else if (status === 'idle') {
+				pointer = null;
+				return;
+			}
+			frame = requestAnimationFrame(step);
+		};
+		frame = requestAnimationFrame(step);
+		return () => cancelAnimationFrame(frame);
+	}
+
+	/** Long pastes scroll away — keep the spoken chunk in view, but only when it isn't. */
+	$effect(() => {
+		const current = sentenceIndex;
+		if (status !== 'playing' || !chunkList) return;
+		chunkList
+			.querySelector(`[data-chunk="${current}"]`)
+			?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+	});
 
 	function jump(to: number) {
 		if (to < 0 || to >= items.length) return;
@@ -280,10 +330,15 @@
 			{#if current.title}
 				<p class="mt-1 text-sm font-medium">{current.title}</p>
 			{/if}
-			<p class="mt-2 text-sm leading-relaxed">
+			<p bind:this={chunkList} class="mt-2 text-sm leading-relaxed">
 				{#each sentences as part, i (i)}
-					<span class={i === sentenceIndex && playing ? 'bg-primary/15' : 'text-muted-foreground'}
-						>{part}
+					<span
+						data-chunk={i}
+						class={i === sentenceIndex && playing ? 'bg-primary/15' : 'text-muted-foreground'}
+					>
+						{#if i === sentenceIndex && pointer && pointer.text === part}
+							<WordLine text={part} word={pointer.word} />
+						{:else}{part}{/if}
 					</span>
 				{/each}
 			</p>

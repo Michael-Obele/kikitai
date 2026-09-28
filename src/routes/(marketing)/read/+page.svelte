@@ -103,7 +103,7 @@
 	/>
 </svelte:head>
 
-<div class="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+<div class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
 	<h1 class="flex items-center gap-2 font-heading text-2xl italic">
 		<ClipboardPaste class="size-5 text-primary" /> Paste &amp; read
 	</h1>
@@ -124,51 +124,57 @@
 		<p class="text-xs text-muted-foreground">{words} words · nothing leaves your device</p>
 	</div>
 
-	<div class="mt-4">
-		<VoicePicker bind:engine bind:voice prefix="read" onchange={voiceChanged} />
-	</div>
-
-	<div class="mt-4 border border-border p-3">
-		<Player
-			{items}
-			{engine}
-			{voice}
-			speed={data.settings?.ttsSpeed}
-			ramp={data.settings?.ttsRamp}
-		/>
-	</div>
-
-	{#if hydrated && telemetry.current.length > 0}
-		<div class="mt-4 border border-border p-3 text-[11px] text-muted-foreground">
-			<div class="flex items-center justify-between">
-				<p class="tracking-widest uppercase">Telemetry</p>
-				<button
-					type="button"
-					class="text-primary hover:underline"
-					onclick={() => (telemetry.current = [])}
-				>
-					Clear
-				</button>
+	<div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
+		<div class="min-w-0">
+			<div class="border border-border p-3">
+				<Player
+					{items}
+					{engine}
+					{voice}
+					speed={data.settings?.ttsSpeed}
+					ramp={data.settings?.ttsRamp}
+				/>
 			</div>
-			<ul class="mt-1.5 space-y-0.5 tabular-nums">
-				<li>
-					First audio: {firstMs === null
-						? 'not played yet'
-						: `${(firstMs / 1000).toFixed(1)} s after Play`}
-					{#if loadMs !== null}· load {(loadMs / 1000).toFixed(1)} s{/if}
-					{#if fetchMs}· bytes {(fetchMs / 1000).toFixed(1)} s{/if} · {ENGINES[engine].label}
-					{#if mirrored !== null}· {mirrored ? 'our mirror' : 'HuggingFace'}{/if}
-				</li>
-				<li>
-					Generation: {chunks.length} chunk{chunks.length === 1 ? '' : 's'}
-					{#if rtf !== null}· RTF {rtf} (Σgen ÷ Σaudio — under 1.0 keeps up){/if}
-					{#if cachedCount > 0}· {cachedCount} from cache{/if}
-				</li>
-				<li>
-					{#if worstGen !== null}Worst chunk: {worstGen} s to synthesise ·{' '}{/if}Multi-thread
-					WASM: {isolated ? 'on (cross-origin isolated)' : 'off (single core)'}
-				</li>
-			</ul>
 		</div>
-	{/if}
+
+		<aside class="space-y-4 lg:sticky lg:top-6">
+			<div class="border border-border p-3">
+				<VoicePicker bind:engine bind:voice prefix="read" onchange={voiceChanged} />
+			</div>
+
+			{#if hydrated && telemetry.current.length > 0}
+				<div class="border border-border p-3 text-[11px] text-muted-foreground">
+					<div class="flex items-center justify-between">
+						<p class="tracking-widest uppercase">Telemetry</p>
+						<button
+							type="button"
+							class="text-primary hover:underline"
+							onclick={() => (telemetry.current = [])}
+						>
+							Clear
+						</button>
+					</div>
+					<ul class="mt-1.5 space-y-0.5 tabular-nums">
+						<li>
+							First audio: {firstMs === null
+								? 'not played yet'
+								: `${(firstMs / 1000).toFixed(1)} s after Play`}
+							{#if loadMs !== null}· load {(loadMs / 1000).toFixed(1)} s{/if}
+							{#if fetchMs}· bytes {(fetchMs / 1000).toFixed(1)} s{/if} · {ENGINES[engine].label}
+							{#if mirrored !== null}· {mirrored ? 'our mirror' : 'HuggingFace'}{/if}
+						</li>
+						<li>
+							Generation: {chunks.length} chunk{chunks.length === 1 ? '' : 's'}
+							{#if rtf !== null}· RTF {rtf} (Σgen ÷ Σaudio — under 1.0 keeps up){/if}
+							{#if cachedCount > 0}· {cachedCount} from cache{/if}
+						</li>
+						<li>
+							{#if worstGen !== null}Worst chunk: {worstGen} s to synthesise ·{' '}{/if}Multi-thread
+							WASM: {isolated ? 'on (cross-origin isolated)' : 'off (single core)'}
+						</li>
+					</ul>
+				</div>
+			{/if}
+		</aside>
+	</div>
 </div>

@@ -335,9 +335,18 @@ export type PreparedSpeech = {
 	chars: number;
 	/** True when the audio came from the on-device cache instead of inference. */
 	cached?: boolean;
+	/** How long this chunk runs — progress (and word highlighting) divides by it. */
+	audioMs: number;
 	/** Plays the generated audio; resolves when the chunk has finished. */
 	play: () => Promise<void>;
 };
+
+/**
+ * Chunks whose duration only reveals itself while playing (Web Speech, cloud
+ * MP3): English runs at roughly 14 characters a second, and `speed` scales that.
+ */
+const estimateMs = (text: string, speed: number) =>
+	Math.round((text.length / (14 * Math.max(0.25, speed))) * 1000);
 
 /**
  * Generate one chunk *without* playing it — the lookahead half of the player.
@@ -352,11 +361,12 @@ export async function prepare(
 ): Promise<PreparedSpeech> {
 	stopped = false;
 	const clean = text.trim();
-	if (!clean) return { genMs: 0, chars: 0, play: async () => {} };
+	if (!clean) return { genMs: 0, chars: 0, audioMs: 0, play: async () => {} };
 
 	const started = performance.now();
 	let play: () => Promise<void>;
 	let cached = false;
+	let audioMs = estimateMs(clean, speed);
 
 	if (engine === 'webspeech') {
 		if (typeof speechSynthesis === 'undefined')
@@ -378,6 +388,8 @@ export async function prepare(
 			const model = engine === 'kitten' ? await loadKitten() : await loadKokoro();
 			const generated = await model.generate(clean, { voice: voiceName, speed });
 			const buffer = toBuffer(generated, context);
+			// Local engines know exactly how long the audio is.
+			audioMs = Math.round(buffer.duration * 1000);
 			void saveAudio(key, buffer.getChannelData(0), buffer.sampleRate);
 			play = async () => {
 				if (stopped) return;
@@ -402,7 +414,7 @@ export async function prepare(
 		session: sessionId,
 		at: Date.now()
 	});
-	return { genMs, chars: clean.length, cached, play };
+	return { genMs, chars: clean.length, cached, audioMs, play };
 }
 
 /** Play a `prepare`d chunk, recording how long the audio actually took. */
