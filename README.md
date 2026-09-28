@@ -36,14 +36,14 @@ bun run dev                 # http://localhost:5173
 
 Scripts:
 
-| Command             | What it does                               |
-| ------------------- | ------------------------------------------ |
-| `bun run dev`       | dev server                                 |
-| `bun run check`     | `svelte-kit sync` + `svelte-check` (types) |
-| `bun run format`    | Prettier write                             |
-| `bun run db:push`   | push the Drizzle schema to `DATABASE_URL`  |
-| `bun run db:studio` | Drizzle Studio (browse tables)             |
-| `bun run build`     | production build (adapter-node → `build/`) |
+| Command             | What it does                                                           |
+| ------------------- | ---------------------------------------------------------------------- |
+| `bun run dev`       | dev server                                                             |
+| `bun run check`     | `svelte-kit sync` + `svelte-check` (types)                             |
+| `bun run format`    | Prettier write                                                         |
+| `bun run db:push`   | push the Drizzle schema to `DATABASE_URL`                              |
+| `bun run db:studio` | Drizzle Studio (browse tables)                                         |
+| `bun run build`     | production build → `build/` (adapter-node; adapter-netlify on Netlify) |
 
 Prefer a local database instead of Neon?
 
@@ -138,6 +138,30 @@ docker compose exec app bun run db:push
 
 The `app` image is built from the repo `Dockerfile` (bun build → adapter-node). Put Caddy/nginx with
 TLS in front of it in production, and set `ORIGIN` to the public URL.
+
+## Deploy to Netlify
+
+The adapter is chosen from the environment in `vite.config.ts`: Netlify sets `NETLIFY=true` in its
+build, so a deploy from Git builds with `adapter-netlify`, while local builds and the Docker image
+keep `adapter-node`. Force one or the other with `KIT_ADAPTER=node` / `KIT_ADAPTER=netlify`.
+
+1. Import the repo as a Netlify site — `netlify.toml` already sets the build command
+   (`bun install && bun run build`) and the publish directory (`build`).
+2. Copy the variables from the table below into **Site configuration → Environment variables**.
+   `.env` is not committed, and `PUBLIC_*` values are baked in **at build time**, so set them before
+   the first deploy. `ORIGIN` must be the site URL (e.g. `https://<site>.netlify.app`) and the same
+   origin must be added to the Google OAuth client as `{ORIGIN}/api/auth/callback/google`.
+3. Deploy. SSR runs in a Netlify Function; static assets publish from `build/`.
+
+Things that behave differently on Netlify:
+
+- **Function timeout** — a synchronous Netlify Function dies after **10s** (raise it to 26s in
+  **Site configuration → Functions** on a paid plan). Slow AI calls (`Organize`, `Re-organize`) can
+  exceed that; the local Kitten/Kokoro voices are unaffected because synthesis runs in the browser.
+- **Database** — `DATABASE_URL` must be a hosted Postgres (Neon); the Docker Postgres on `:5432`
+  isn't reachable from Netlify. Run `bun run db:push` against it once.
+- **No local disk** — server-side caching lives in Postgres (`tts_audio`), not the filesystem, so
+  the read-only function filesystem is fine.
 
 ## Environment variables
 
