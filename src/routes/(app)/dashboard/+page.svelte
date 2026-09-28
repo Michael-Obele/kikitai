@@ -176,7 +176,14 @@
 		</div>
 
 		<Tabs.Root class="mt-3" bind:value={category}>
-			<Tabs.List>
+			<!--
+				The list defaults to w-fit, which outruns a phone and drags the whole
+				page sideways. Keep hugging on desktop; on a phone it caps at the row
+				and scrolls inside itself.
+			-->
+			<Tabs.List
+				class="max-w-full scrollbar-none justify-start overflow-x-auto [&::-webkit-scrollbar]:hidden"
+			>
 				<Tabs.Trigger value="all">All</Tabs.Trigger>
 				{#each CATEGORIES as cat (cat)}
 					<Tabs.Trigger value={cat}>{CATEGORY_LABELS[cat]}</Tabs.Trigger>
