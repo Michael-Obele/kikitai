@@ -18,21 +18,25 @@
 		loadDetails,
 		loadListenScript,
 		loadThreadSummary,
-		regenerateSummary
+		regenerateSummary,
+		saveVoiceChoice,
+		simplifyMessage
 	} from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
 	import type { InboxItem, MessageDetails, MessageDto } from '$lib/types/mail';
 	import type { EngineId } from '$lib/tts';
+	import VoicePicker from '$lib/components/player/voice-picker.svelte';
 
 	let {
 		item,
-		engine,
-		voice,
+		engine: initialEngine,
+		voice: initialVoice,
 		speed = 1,
 		ramp = false,
 		onsaved
 	}: {
 		item: InboxItem;
+		/** Starting choice from Settings — the panel owns it from here. */
 		engine: EngineId;
 		voice: string;
 		/** Saved speed cap (settings.ttsSpeed). */
@@ -43,8 +47,14 @@
 		onsaved?: (fresh: MessageDto) => void;
 	} = $props();
 
+	// svelte-ignore state_referenced_locally
+	let engine = $state<EngineId>(initialEngine);
+	// svelte-ignore state_referenced_locally
+	let voice = $state(initialVoice);
 	let reorganizing = $state(false);
 	let showOriginal = $state(false);
+	let simplified = $state<string | null>(null);
+	let simplifying = $state(false);
 	let details = $state<MessageDetails | null>(null);
 	let thread = $state<{ summary: string; highlights: string[]; messageCount: number } | null>(null);
 	let spokenText = $state<string | null>(null);
@@ -59,6 +69,8 @@
 		thread = null;
 		spokenText = null;
 		showOriginal = false;
+		simplified = null;
+		simplifying = false;
 		loadingDetails = false;
 		loadingThread = false;
 		loadingSpoken = false;
@@ -110,6 +122,28 @@
 			toast.error(errorMessage(error));
 		} finally {
 			loadingSpoken = false;
+		}
+	}
+
+	/** The panel owns the voice choice now, so persist it the same way /read does. */
+	function persistVoice() {
+		void saveVoiceChoice({ engine, voice }).catch(() => {
+			/* best effort — the picker keeps working without a settings row */
+		});
+	}
+
+	/** The only place a body costs an AI call: on request, then stored for good. */
+	async function simplify() {
+		simplifying = true;
+		try {
+			await simplifyMessage(item.id);
+			const fresh = await getMessage(item.id);
+			simplified = fresh.cleanBody;
+			onsaved?.(fresh);
+		} catch (error) {
+			toast.error(errorMessage(error));
+		} finally {
+			simplifying = false;
 		}
 	}
 </script>
@@ -173,14 +207,14 @@
 
 	{#await getMessage(item.id)}
 		<div class="flex items-center gap-2 text-sm text-muted-foreground">
-			<LoaderCircle class="size-4 animate-spin" /> Cleaning this message with AI — the first open of a
-			message takes about ten seconds…
+			<LoaderCircle class="size-4 animate-spin" /> Loading message…
 		</div>
 	{:then full}
 		{@const spoken = spokenText ?? full.spokenText}
-		{@const body = showOriginal || !full.cleanBody ? full.bodyText : full.cleanBody}
+		{@const cleaned = simplified ?? full.cleanBody}
+		{@const body = showOriginal || !cleaned ? full.bodyText : cleaned}
 		{#if full.bodyText}
-			{#if full.cleanBody}
+			{#if cleaned}
 				<div class="flex items-center justify-between gap-2">
 					<p class="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
 						<WandSparkles class="size-3 shrink-0 text-primary" />
@@ -205,6 +239,21 @@
 			>
 				{body}
 			</div>
+			{#if !cleaned}
+				<div class="mt-2 flex flex-wrap items-center gap-2">
+					<Button variant="outline" size="sm" onclick={simplify} disabled={simplifying}>
+						{#if simplifying}
+							<LoaderCircle class="size-4 animate-spin" /> Simplifying…
+						{:else}
+							<WandSparkles class="size-4" /> Simplify with AI
+						{/if}
+					</Button>
+					<p class="text-xs text-muted-foreground">
+						Drops links and mailing-list furniture, keeps every fact — then it's saved to this
+						message, so it never runs twice.
+					</p>
+				</div>
+			{/if}
 		{:else}
 			<p class="text-sm text-muted-foreground italic">
 				No plain-text body was found in this message (it may be image-only).
@@ -248,6 +297,10 @@
 			</section>
 		{/if}
 
+		<div class="border-t border-border pt-3">
+			<VoicePicker bind:engine bind:voice prefix="msg" onchange={persistVoice} />
+		</div>
+
 		<div class="flex flex-wrap items-center gap-2 border-t border-border pt-3">
 			<Volume2 class="size-4 shrink-0 text-primary" />
 			<div class="min-w-0 flex-1">
@@ -263,7 +316,7 @@
 							title: item.subject,
 							text:
 								spoken ??
-								[item.summary ?? '', full.cleanBody ?? full.bodyText]
+								[item.summary ?? '', cleaned ?? full.bodyText]
 									.filter(Boolean)
 									.join('\n\n')
 									.slice(0, 2000)

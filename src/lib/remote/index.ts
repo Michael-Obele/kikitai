@@ -5,6 +5,7 @@ export {
 	syncMail,
 	getInbox,
 	getMessage,
+	simplifyMessage,
 	getDigest,
 	getAccountStatus,
 	markDigested,

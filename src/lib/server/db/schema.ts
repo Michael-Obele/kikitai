@@ -97,6 +97,22 @@ export const message = pgTable(
 );
 
 /**
+ * Synthesized audio from the paid engines (Google, MiniMax), keyed by what
+ * produced it — the vendor API is called once per unique engine/voice/text and
+ * never again, so a replay costs nothing.
+ */
+export const ttsAudio = pgTable('tts_audio', {
+	id: id(),
+	/** sha256(engine|voice|text) — a repeat request hits this row, not the vendor. */
+	key: text('key').notNull().unique(),
+	engine: text('engine').notNull(),
+	mime: text('mime').notNull().default('audio/mpeg'),
+	/** base64 payload exactly as the vendor returns it. */
+	audio: text('audio').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+/**
  * One summary per conversation, shared by every message in the thread.
  * Generated on demand, then cached — the AI is never asked twice.
  */

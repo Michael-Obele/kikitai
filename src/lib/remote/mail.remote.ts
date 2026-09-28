@@ -241,13 +241,34 @@ export const getMessage = query(v.string(), async (id): Promise<MessageDto> => {
 		.from(message)
 		.where(and(eq(message.id, id), inArray(message.accountId, accountIds)));
 	if (!row) error(404, 'Message not found');
-	// First open pays one AI call; every later open is a column read.
-	const cleanBody = (await cleanedBody(row, user.id).catch(() => null)) ?? row.cleanBody;
+	// No AI on open: the raw body renders instantly and the reader asks for a
+	// simplification. Loading a message must never cost an inference — that wait
+	// used to happen on every first open.
 	const [{ count: threadCount }] = await db
 		.select({ count: count() })
 		.from(message)
 		.where(and(eq(message.accountId, row.accountId), eq(message.threadId, row.threadId)));
-	return { ...toMessageDto({ ...row, cleanBody }), threadCount };
+	return { ...toMessageDto(row), threadCount };
+});
+
+/**
+ * Simplify one body when the reader asks for it — the only path that spends an
+ * AI call on a body, and `cleanedBody` stores the result, so each message is
+ * simplified at most once ever (a failure retries next time, nothing wasted).
+ */
+export const simplifyMessage = command(v.string(), async (id): Promise<{ id: string }> => {
+	const { user } = await requireUser();
+	const accountIds = await ownedAccountIds(user.id);
+	const [row] = await db
+		.select()
+		.from(message)
+		.where(and(eq(message.id, id), inArray(message.accountId, accountIds)));
+	if (!row) error(404, 'Message not found');
+
+	const clean = await cleanedBody(row, user.id);
+	if (!clean) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	void getMessage(id).refresh();
+	return { id };
 });
 
 /**

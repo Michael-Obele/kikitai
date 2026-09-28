@@ -4,6 +4,7 @@
 	import { PersistedState } from 'runed';
 	import { Label } from '$lib/components/ui/label';
 	import Player from '$lib/components/player/player.svelte';
+	import VoicePicker from '$lib/components/player/voice-picker.svelte';
 	import { saveVoiceChoice } from '$lib/remote';
 	import { ENGINES, type EngineId } from '$lib/tts';
 	import { onTtsStat, sessionId, type TtsStat } from '$lib/tts/telemetry';
@@ -28,7 +29,6 @@
 	/** localStorage only exists on the client — adopt it after mount. */
 	let hydrated = $state(false);
 
-	const meta = $derived(ENGINES[engine]);
 	const words = $derived(text.trim() ? text.trim().split(/\s+/).length : 0);
 	const items = $derived(text.trim() ? [{ id: 'paste', text }] : []);
 
@@ -93,12 +93,6 @@
 			/* signed out — localStorage is the source of truth */
 		});
 	}
-
-	function engineChanged(event: Event) {
-		engine = (event.currentTarget as HTMLSelectElement).value as EngineId;
-		voice = ENGINES[engine].defaultVoice;
-		voiceChanged();
-	}
 </script>
 
 <svelte:head>
@@ -130,35 +124,8 @@
 		<p class="text-xs text-muted-foreground">{words} words · nothing leaves your device</p>
 	</div>
 
-	<div class="mt-4 flex flex-wrap items-end gap-3">
-		<div class="space-y-1.5">
-			<Label for="readEngine">Engine</Label>
-			<select
-				id="readEngine"
-				class="flex h-8 border border-input bg-background px-2 text-sm"
-				value={engine}
-				onchange={engineChanged}
-			>
-				{#each Object.values(ENGINES) as option (option.id)}
-					<option value={option.id}>{option.label}</option>
-				{/each}
-			</select>
-		</div>
-		{#if meta.voices.length > 0}
-			<div class="space-y-1.5">
-				<Label for="readVoice">Voice</Label>
-				<select
-					id="readVoice"
-					class="flex h-8 border border-input bg-background px-2 text-sm"
-					bind:value={voice}
-					onchange={voiceChanged}
-				>
-					{#each meta.voices as option (option)}
-						<option value={option}>{option}</option>
-					{/each}
-				</select>
-			</div>
-		{/if}
+	<div class="mt-4">
+		<VoicePicker bind:engine bind:voice prefix="read" onchange={voiceChanged} />
 	</div>
 
 	<div class="mt-4 border border-border p-3">
