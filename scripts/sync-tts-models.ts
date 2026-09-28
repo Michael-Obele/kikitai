@@ -14,18 +14,24 @@ const HF = 'https://huggingface.co';
 const repoId = process.env.TTS_REPO ?? 'KittenML/kitten-tts-nano-0.8';
 const bucket = process.env.TTS_S3_BUCKET ?? 'tts-models';
 const endpoint = process.env.AWS_ENDPOINT_URL_S3;
-const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+// S3_* on purpose: Netlify reserves AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
+// AWS_REGION, so the names must be settable there without being rejected.
+const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
-for (const [key, value] of Object.entries({ endpoint, accessKeyId, secretAccessKey })) {
-	if (!value) throw new Error(`${key.toUpperCase()} is not set — check .env`);
+for (const [key, value] of Object.entries({
+	AWS_ENDPOINT_URL_S3: endpoint,
+	S3_ACCESS_KEY_ID: accessKeyId,
+	S3_SECRET_ACCESS_KEY: secretAccessKey
+})) {
+	if (!value) throw new Error(`${key} is not set — check .env`);
 }
 
 const prefix = `kitten/${repoId.split('/').pop()}`;
 const base = `${endpoint}/${bucket}/${prefix}`;
 
 const s3 = new S3Client({
-	region: process.env.AWS_REGION ?? 'us-east-2',
+	region: process.env.S3_REGION ?? 'us-east-2',
 	endpoint,
 	credentials: { accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! },
 	// Neon Object Storage is path-style only: bucket.host/key is unsupported.

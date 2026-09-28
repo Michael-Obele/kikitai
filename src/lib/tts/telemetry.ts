@@ -25,6 +25,8 @@ export type TtsStat = {
 	mirror?: boolean;
 	/** `load`: milliseconds spent seeding model bytes (0 when already cached). */
 	fetchMs?: number;
+	/** `load`: per-phase milliseconds — the breakdown behind the single number. */
+	phases?: Record<string, number>;
 	/** Page load this stat belongs to — a persisted history never mixes runs. */
 	session: string;
 	/** Characters synthesized — meaningful for `gen` and `chunk`. */

@@ -169,15 +169,36 @@ async function loadKitten() {
 		const started = performance.now();
 		let mirrored = false;
 		let fetchMs = 0;
+		// Phase marks behind the card's single load number: seed (mirror/cache),
+		// prime (ONNX runtime + WASM), mod (CDN module import), model (weights
+		// parse + session create). Answers "why is load 6–8 s" without guessing.
+		let seedMs = 0;
+		let primeMs = 0;
+		let modMs = 0;
+		let modelMs = 0;
 		kitten = seedKittenModel()
 			.catch(() => ({ ok: false, fetchMs: 0 }))
 			.then((seeded) => {
 				mirrored = seeded.ok;
 				fetchMs = Math.round(seeded.fetchMs);
-				return primeOnnxRuntime();
+				seedMs = Math.round(performance.now() - started);
+				const t = performance.now();
+				return primeOnnxRuntime().finally(() => {
+					primeMs = Math.round(performance.now() - t);
+				});
 			})
-			.then(() => import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kitten}`))
-			.then((mod: any) => mod.KittenTTS.from_pretrained(TTS_MODELS.kitten))
+			.then(() => {
+				const t = performance.now();
+				return import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kitten}`).finally(() => {
+					modMs = Math.round(performance.now() - t);
+				});
+			})
+			.then((mod: any) => {
+				const t = performance.now();
+				return mod.KittenTTS.from_pretrained(TTS_MODELS.kitten).finally(() => {
+					modelMs = Math.round(performance.now() - t);
+				});
+			})
 			.then((model) => {
 				recordTts({
 					engine: 'kitten',
@@ -185,6 +206,7 @@ async function loadKitten() {
 					ms: performance.now() - started,
 					mirror: mirrored,
 					fetchMs,
+					phases: { seed: seedMs, prime: primeMs, mod: modMs, model: modelMs },
 					session: sessionId,
 					at: Date.now()
 				});
@@ -200,29 +222,43 @@ async function loadKokoro() {
 		// WebGPU wants fp32 (kokoro-js recommends it; int8 is the slow path on GPU).
 		// fp32+WASM measured RTF ~1.6 here — too slow to keep up with playback.
 		const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
-		kokoro = import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`)
-			.then((mod: any) =>
-				mod.KokoroTTS.from_pretrained(
+		let modMs = 0;
+		let modelMs = 0;
+		const importMod = () => {
+			const t = performance.now();
+			return import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`).finally(() => {
+				modMs = Math.round(performance.now() - t);
+			});
+		};
+		kokoro = importMod()
+			.then((mod: any) => {
+				const t = performance.now();
+				return mod.KokoroTTS.from_pretrained(
 					TTS_MODELS.kokoro,
 					gpu ? { dtype: 'fp32', device: 'webgpu' } : { dtype: 'q8', device: 'wasm' }
 				)
-			)
-			.catch(async (error: unknown) => {
-				// 310MB of fp32 does not fit in every browser's WASM heap — drop to the
-				// 90MB build rather than leaving the player dead with "no available backend".
-				if (!gpu || !/out of memory|no available backend|Aborted/i.test(String(error))) throw error;
-				console.warn('[tts] fp32/WebGPU would not load — retrying the 90MB WASM build', error);
-				const mod: any = await import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`);
-				return mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, {
-					dtype: 'q8',
-					device: 'wasm'
-				});
+					.catch(async (error: unknown) => {
+						// 310MB of fp32 does not fit in every browser's WASM heap — drop to the
+						// 90MB build rather than leaving the player dead with "no available backend".
+						if (!gpu || !/out of memory|no available backend|Aborted/i.test(String(error)))
+							throw error;
+						console.warn('[tts] fp32/WebGPU would not load — retrying the 90MB WASM build', error);
+						const mod = await importMod();
+						return mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, {
+							dtype: 'q8',
+							device: 'wasm'
+						});
+					})
+					.finally(() => {
+						modelMs = Math.round(performance.now() - t);
+					});
 			})
 			.then((model) => {
 				recordTts({
 					engine: 'kokoro',
 					kind: 'load',
 					ms: performance.now() - started,
+					phases: { mod: modMs, model: modelMs },
 					session: sessionId,
 					at: Date.now()
 				});
@@ -321,6 +357,10 @@ export function resumePlayback() {
 function playBuffer(buffer: AudioBuffer): Promise<void> {
 	return new Promise((done) => {
 		const context = audioContext();
+		// The opener can be prepared before any user gesture (warm-up), when the
+		// context is still suspended — resume on the Play gesture or the chunk
+		// would sit inaudible forever without firing `onended`.
+		if (context.state === 'suspended') void context.resume();
 		const node = context.createBufferSource();
 		node.buffer = buffer;
 		node.connect(context.destination);

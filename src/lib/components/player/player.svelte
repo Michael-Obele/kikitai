@@ -131,6 +131,60 @@
 		}
 	});
 
+	/** Key that both the warm-up and `start()` build for a chunk. */
+	function openerKey(engineId: EngineId, voiceName: string, speed: number, text: string) {
+		return JSON.stringify([engineId, voiceName, speed, text]);
+	}
+
+	/** Warmed chunk keys → their in-flight generation; each entry is consumed once. */
+	const warmed = new Map<string, Promise<PreparedSpeech>>();
+
+	/** Take a warmed chunk out of the bank — never twice, never stale. */
+	function takeWarmed(text: string, engineId: EngineId, voiceName: string, speed: number) {
+		const key = openerKey(engineId, voiceName, speed, text);
+		const promise = warmed.get(key);
+		if (promise) warmed.delete(key);
+		return promise ?? null;
+	}
+
+	/**
+	 * Warm bank: once text, voice and speed sit still for a beat, the first
+	 * three chunks generate ahead of Play. Chunk 0 covers the press-to-first-
+	 * sound wait (4.1 s measured with Kitten); chunks 1–2 give the lookahead
+	 * queue something to draw on from the very first boundary, so a slow
+	 * inference behind a short chunk no longer cuts an audible gap. Local
+	 * engines only — cloud TTS would burn quota on typing.
+	 */
+	$effect(() => {
+		const opener = sentences.slice(0, 3);
+		const speed = liveSpeed;
+		if (opener.length === 0 || ENGINES[engine].downloadMb === 0) return;
+		// The download notice gates model work for the big engines — same rule as Play.
+		if (!localStorage.getItem(ackKey(engine))) return;
+		const keys = opener.map((text) => openerKey(engine, voice, speed, text));
+		let cancelled = false;
+		let chain: Promise<unknown> = Promise.resolve();
+		const timer = setTimeout(() => {
+			// Read outside the reactive context: `status` must not become a
+			// dependency, or the Play press itself would wipe the bank.
+			if (status !== 'idle') return;
+			for (let s = 0; s < opener.length; s++) {
+				const key = keys[s]!;
+				const job = chain.then(() => {
+					if (cancelled) throw new Error('warm superseded');
+					return prepare(engine, voice, opener[s]!, speed);
+				});
+				warmed.set(key, tracked(job));
+				chain = job.catch(() => {});
+			}
+		}, 500);
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+			for (const key of keys) warmed.delete(key);
+		};
+	});
+
 	/**
 	 * ONNX Runtime reports memory trouble as "no available backend found … out of
 	 * memory", which tells the reader nothing. Say what broke and what to do.
@@ -174,17 +228,34 @@
 			if (run !== myRun) return;
 			index = i;
 			const parts = firstChunk(toSentences(items[i]!.text));
-			// Lookahead: sentence N+1 generates while N is speaking, so the ONNX
-			// work leaves the critical path whenever generation beats playback.
-			let pending: Promise<PreparedSpeech> | null = tracked(
-				prepare(engine, voice, parts[0]!, liveSpeed)
-			);
+			// Lookahead queue: generation stays strictly in order but decoupled from
+			// playback — while chunk s speaks, spare time banks s+1 AND s+2, so a slow
+			// inference behind a short chunk no longer cuts an audible gap (the
+			// one-deep lookahead had ~4-5 s stalls with Kitten, ~2 s with Kokoro).
+			const queued = new Map<number, Promise<PreparedSpeech>>();
+			let chain: Promise<unknown> = Promise.resolve();
+			const ensure = (s: number) => {
+				if (s >= parts.length || queued.has(s)) return;
+				const opener = takeWarmed(parts[s]!, engine, voice, liveSpeed);
+				const job =
+					opener ??
+					chain.then(() => {
+						// A superseded run must not keep burning CPU on stale chunks.
+						if (run !== myRun) throw new Error('superseded');
+						return prepare(engine, voice, parts[s]!, liveSpeed);
+					});
+				queued.set(s, tracked(job));
+				chain = job.catch(() => {});
+			};
 			for (let s = 0; s < parts.length; s++) {
 				if (run !== myRun) return;
 				sentenceIndex = s;
+				ensure(s);
+				ensure(s + 1);
+				ensure(s + 2);
 				let prepared: PreparedSpeech;
 				try {
-					prepared = await pending!;
+					prepared = await queued.get(s)!;
 				} catch (error) {
 					toast.error(error instanceof Error ? error.message : String(error));
 					// Never leave the transport stuck on "playing" after a failed prepare.
@@ -192,8 +263,6 @@
 					return;
 				}
 				if (run !== myRun) return;
-				pending =
-					s + 1 < parts.length ? tracked(prepare(engine, voice, parts[s + 1]!, liveSpeed)) : null;
 				if (run !== myRun) return;
 				// The wait a listener feels: Play press → the moment sound starts.
 				if (!firstAudioRecorded) {
