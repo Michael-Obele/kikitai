@@ -10,13 +10,30 @@ import type { EngineId } from './index';
  */
 export type TtsStat = {
 	engine: EngineId;
-	kind: 'load' | 'gen' | 'play';
-	/** Duration in milliseconds. */
+	/**
+	 * `chunk` pairs one generation with the playback it produced — the only
+	 * honest source for RTF. `first` is Play press → first sound.
+	 */
+	kind: 'load' | 'gen' | 'chunk' | 'first';
+	/** Duration in milliseconds (for `chunk`: how long it took to speak). */
 	ms: number;
-	/** Characters synthesized — only meaningful for `gen`. */
+	/** `chunk`: milliseconds spent generating this exact chunk. */
+	genMs?: number;
+	/** `chunk`: true when the audio came from the on-device cache. */
+	cached?: boolean;
+	/** `load`: true when the bytes came from our mirror instead of HuggingFace. */
+	mirror?: boolean;
+	/** `load`: milliseconds spent seeding model bytes (0 when already cached). */
+	fetchMs?: number;
+	/** Page load this stat belongs to — a persisted history never mixes runs. */
+	session: string;
+	/** Characters synthesized — meaningful for `gen` and `chunk`. */
 	chars?: number;
 	at: number;
 };
+
+/** New id per page load: lets the panel filter persisted stats back to one run. */
+export const sessionId = crypto.randomUUID();
 
 const MAX_STATS = 200;
 const buffer: TtsStat[] = [];
@@ -26,7 +43,12 @@ const listeners = new Set<(stat: TtsStat) => void>();
 export function recordTts(stat: TtsStat): void {
 	buffer.push(stat);
 	if (buffer.length > MAX_STATS) buffer.shift();
-	const detail = stat.kind === 'gen' && stat.chars ? ` · ${stat.chars}ch` : '';
+	const detail =
+		stat.kind === 'chunk'
+			? ` (gen ${Math.round(stat.genMs ?? 0)}ms${stat.cached ? ', cached' : ''})`
+			: stat.chars
+				? ` · ${stat.chars}ch`
+				: '';
 	console.debug(`[tts] ${stat.kind} ${Math.round(stat.ms)}ms${detail} (${stat.engine})`);
 	for (const listener of [...listeners]) listener(stat);
 }

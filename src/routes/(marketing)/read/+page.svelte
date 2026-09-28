@@ -6,7 +6,7 @@
 	import Player from '$lib/components/player/player.svelte';
 	import { saveVoiceChoice } from '$lib/remote';
 	import { ENGINES, type EngineId } from '$lib/tts';
-	import { onTtsStat, type TtsStat } from '$lib/tts/telemetry';
+	import { onTtsStat, sessionId, type TtsStat } from '$lib/tts/telemetry';
 
 	let { data } = $props();
 
@@ -32,18 +32,30 @@
 	const words = $derived(text.trim() ? text.trim().split(/\s+/).length : 0);
 	const items = $derived(text.trim() ? [{ id: 'paste', text }] : []);
 
-	const loads = $derived(telemetry.current.filter((s) => s.kind === 'load'));
-	const gens = $derived(telemetry.current.filter((s) => s.kind === 'gen'));
-	const plays = $derived(telemetry.current.filter((s) => s.kind === 'play'));
-	const genAvg = $derived(avgMs(gens));
-	const playAvg = $derived(avgMs(plays));
-	/** Below 1.0 means generation keeps up with playback — no silent gaps. */
-	const ratio = $derived(playAvg > 0 ? Math.round((genAvg / playAvg) * 100) / 100 : 0);
-
-	function avgMs(list: TtsStat[]) {
-		if (list.length === 0) return 0;
-		return Math.round(list.reduce((sum, s) => sum + s.ms, 0) / list.length);
-	}
+	/**
+	 * Only this page load *and* the selected engine — a session that warmed
+	 * both engines must not label one's load time as the other's.
+	 */
+	const mine = $derived(
+		telemetry.current.filter((s) => s.session === sessionId && s.engine === engine)
+	);
+	const loads = $derived(mine.filter((s) => s.kind === 'load'));
+	const chunks = $derived(mine.filter((s) => s.kind === 'chunk'));
+	const firsts = $derived(mine.filter((s) => s.kind === 'first'));
+	const loadMs = $derived(loads.at(-1)?.ms ?? null);
+	const firstMs = $derived(firsts.at(-1)?.ms ?? null);
+	const cachedCount = $derived(chunks.filter((s) => s.cached).length);
+	const mirrored = $derived(loads.at(-1)?.mirror ?? null);
+	const fetchMs = $derived(loads.at(-1)?.fetchMs ?? null);
+	/** Σgen ÷ Σaudio over the SAME chunks — under 1.0 means playback never waits. */
+	const rtf = $derived.by(() => {
+		const gen = chunks.reduce((sum, s) => sum + (s.genMs ?? 0), 0);
+		const audio = chunks.reduce((sum, s) => sum + s.ms, 0);
+		return audio > 0 ? Math.round((gen / audio) * 100) / 100 : null;
+	});
+	const worstGen = $derived.by(() =>
+		chunks.length ? Math.round(Math.max(...chunks.map((s) => s.genMs ?? 0)) / 1000) : null
+	);
 
 	/** Survive back-navigation; the text is never sent anywhere. */
 	export const snapshot: Snapshot<string> = {
@@ -173,20 +185,21 @@
 			</div>
 			<ul class="mt-1.5 space-y-0.5 tabular-nums">
 				<li>
-					Model load: {loads.length > 0
-						? `${Math.round(loads[loads.length - 1]!.ms)} ms`
-						: 'not loaded this session'}
-					· {ENGINES[engine].label}
+					First audio: {firstMs === null
+						? 'not played yet'
+						: `${(firstMs / 1000).toFixed(1)} s after Play`}
+					{#if loadMs !== null}· load {(loadMs / 1000).toFixed(1)} s{/if}
+					{#if fetchMs}· bytes {(fetchMs / 1000).toFixed(1)} s{/if} · {ENGINES[engine].label}
+					{#if mirrored !== null}· {mirrored ? 'our mirror' : 'HuggingFace'}{/if}
 				</li>
 				<li>
-					Generation: {genAvg} ms avg over {gens.length} sentence{gens.length === 1 ? '' : 's'}
+					Generation: {chunks.length} chunk{chunks.length === 1 ? '' : 's'}
+					{#if rtf !== null}· RTF {rtf} (Σgen ÷ Σaudio — under 1.0 keeps up){/if}
+					{#if cachedCount > 0}· {cachedCount} from cache{/if}
 				</li>
 				<li>
-					Playback: {playAvg} ms avg · gen/play = {ratio}
-					{ratio === 0 ? '' : ratio < 1 ? '(keeps up — no gaps)' : '(gaps ahead)'}
-				</li>
-				<li>
-					Multi-thread WASM: {isolated ? 'on (cross-origin isolated)' : 'off (single core)'}
+					{#if worstGen !== null}Worst chunk: {worstGen} s to synthesise ·{' '}{/if}Multi-thread
+					WASM: {isolated ? 'on (cross-origin isolated)' : 'off (single core)'}
 				</li>
 			</ul>
 		</div>

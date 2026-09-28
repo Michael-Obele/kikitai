@@ -17,6 +17,8 @@
 	import {
 		DEFAULT_SPEED,
 		ENGINES,
+		downloadEstimate,
+		firstChunk,
 		halt,
 		pausePlayback,
 		prepare,
@@ -27,6 +29,7 @@
 		type PreparedSpeech
 	} from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
+	import { recordTts, sessionId } from '$lib/tts/telemetry';
 	import SpeedMenu from './speed-menu.svelte';
 
 	type Item = { id: string; text: string; title?: string };
@@ -57,7 +60,8 @@
 	let noticeOpen = $state(false);
 
 	let current = $derived(items[index] ?? null);
-	let sentences = $derived(current ? toSentences(current.text) : []);
+	/** Same split the play loop uses, so the highlight tracks the real chunk. */
+	let sentences = $derived(current ? firstChunk(toSentences(current.text)) : []);
 	let playing = $derived(status === 'playing' || status === 'loading');
 
 	/** Generation counter — any stale loop bails out as soon as it changes. */
@@ -146,10 +150,12 @@
 		if (run !== myRun) return;
 
 		status = 'playing';
+		const pressedAt = performance.now();
+		let firstAudioRecorded = false;
 		for (let i = Math.max(from, 0); i < items.length; i++) {
 			if (run !== myRun) return;
 			index = i;
-			const parts = toSentences(items[i]!.text);
+			const parts = firstChunk(toSentences(items[i]!.text));
 			// Lookahead: sentence N+1 generates while N is speaking, so the ONNX
 			// work leaves the critical path whenever generation beats playback.
 			let pending: Promise<PreparedSpeech> | null = tracked(
@@ -163,11 +169,25 @@
 					prepared = await pending!;
 				} catch (error) {
 					toast.error(error instanceof Error ? error.message : String(error));
+					// Never leave the transport stuck on "playing" after a failed prepare.
+					if (run === myRun) status = 'idle';
 					return;
 				}
 				if (run !== myRun) return;
 				pending =
 					s + 1 < parts.length ? tracked(prepare(engine, voice, parts[s + 1]!, liveSpeed)) : null;
+				if (run !== myRun) return;
+				// The wait a listener feels: Play press → the moment sound starts.
+				if (!firstAudioRecorded) {
+					firstAudioRecorded = true;
+					recordTts({
+						engine,
+						kind: 'first',
+						ms: performance.now() - pressedAt,
+						session: sessionId,
+						at: Date.now()
+					});
+				}
 				try {
 					await playPrepared(engine, prepared);
 				} catch (error) {
@@ -329,7 +349,7 @@
 			<Dialog.Header>
 				<Dialog.Title class="flex items-center gap-2">
 					<Download class="size-4 text-primary" />
-					Downloads {ENGINES[pendingEngine ?? engine].downloadMb}MB once
+					Downloads {downloadEstimate(pendingEngine ?? engine)}MB once
 				</Dialog.Title>
 				<Dialog.Description>
 					{ENGINES[pendingEngine ?? engine].label} runs entirely in this browser: the voice model is downloaded
