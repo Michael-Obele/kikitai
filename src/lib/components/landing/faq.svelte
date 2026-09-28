@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ChevronDown } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 
 	/** The objections that decide whether someone self-hosts, answered plainly. */
@@ -59,11 +60,11 @@
 		{#each faqs as faq, i (faq.q)}
 			<div class="border-b">
 				<h4>
-					<button
-						type="button"
+					<Button
+						variant="ghost"
 						onclick={() => toggle(i)}
 						aria-expanded={open === i}
-						class="group flex w-full items-center justify-between gap-6 py-4 text-left"
+						class="group h-auto w-full justify-between gap-6 rounded-none px-0 py-4 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
 					>
 						<span
 							class={cn(
@@ -77,7 +78,7 @@
 								open === i && 'rotate-180'
 							)}
 						/>
-					</button>
+					</Button>
 				</h4>
 				<div
 					class="grid motion-safe:transition-[grid-template-rows] motion-safe:duration-300 motion-safe:ease-out"

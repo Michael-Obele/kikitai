@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { Cloud, Cpu, HardDrive, Mic } from '@lucide/svelte';
 	import { Label } from '$lib/components/ui/label';
+	import * as Select from '$lib/components/ui/select';
 	import { ENGINES, type EngineId } from '$lib/tts';
 
 	let {
@@ -17,15 +19,22 @@
 	} = $props();
 
 	const meta = $derived(ENGINES[engine]);
+	const engineItems = $derived(
+		Object.values(ENGINES).map((option) => ({ value: option.id, label: option.label }))
+	);
+	const voiceItems = $derived(meta.voices.map((name) => ({ value: name, label: name })));
 
-	function pickEngine(event: Event) {
-		engine = (event.currentTarget as HTMLSelectElement).value as EngineId;
+	/** Picking an engine re-seeds the voice before the host persists both. */
+	function pickEngine(next: string) {
+		if (!next || next === engine) return;
+		engine = next as EngineId;
 		voice = ENGINES[engine].defaultVoice;
 		onchange?.();
 	}
 
-	function pickVoice(event: Event) {
-		voice = (event.currentTarget as HTMLSelectElement).value;
+	function pickVoice(next: string) {
+		if (!next || next === voice) return;
+		voice = next;
 		onchange?.();
 	}
 </script>
@@ -37,31 +46,46 @@
 <div class="flex flex-wrap items-end gap-3">
 	<div class="space-y-1.5">
 		<Label for="{prefix}-engine">Engine</Label>
-		<select
-			id="{prefix}-engine"
-			class="flex h-8 border border-input bg-background px-2 text-sm"
-			value={engine}
-			onchange={pickEngine}
-		>
-			{#each Object.values(ENGINES) as option (option.id)}
-				<option value={option.id}>{option.label}</option>
-			{/each}
-		</select>
+		<Select.Root type="single" value={engine} items={engineItems} onValueChange={pickEngine}>
+			<Select.Trigger id="{prefix}-engine" class="min-w-44" aria-describedby="{prefix}-note">
+				<span class="flex items-center gap-1.5">
+					<Cpu class="size-4 text-muted-foreground" />
+					<Select.Value placeholder="Engine" />
+				</span>
+			</Select.Trigger>
+			<Select.Content>
+				{#each engineItems as option (option.value)}
+					<Select.Item value={option.value} label={option.label}>
+						{option.label}
+						{#if ENGINES[option.value].local}
+							<HardDrive class="ml-auto size-3.5 text-muted-foreground" />
+						{:else}
+							<Cloud class="ml-auto size-3.5 text-muted-foreground" />
+						{/if}
+					</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 	</div>
 	{#if meta.voices.length > 0}
 		<div class="space-y-1.5">
 			<Label for="{prefix}-voice">Voice</Label>
-			<select
-				id="{prefix}-voice"
-				class="flex h-8 border border-input bg-background px-2 text-sm"
-				value={voice}
-				onchange={pickVoice}
-			>
-				{#each meta.voices as option (option)}
-					<option value={option}>{option}</option>
-				{/each}
-			</select>
+			<Select.Root type="single" value={voice} items={voiceItems} onValueChange={pickVoice}>
+				<Select.Trigger id="{prefix}-voice" class="min-w-40" aria-describedby="{prefix}-note">
+					<span class="flex items-center gap-1.5">
+						<Mic class="size-4 text-muted-foreground" />
+						<Select.Value placeholder="Voice" />
+					</span>
+				</Select.Trigger>
+				<Select.Content>
+					{#each voiceItems as option (option.value)}
+						<Select.Item value={option.value} label={option.label} />
+					{/each}
+				</Select.Content>
+			</Select.Root>
 		</div>
 	{/if}
-	<p class="max-w-56 text-[11px] leading-tight text-muted-foreground">{meta.note}</p>
+	<p id="{prefix}-note" class="max-w-56 text-[11px] leading-tight text-muted-foreground">
+		{meta.note}
+	</p>
 </div>

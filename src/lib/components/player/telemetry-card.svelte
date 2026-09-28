@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PersistedState } from 'runed';
+	import { Button } from '$lib/components/ui/button';
 	import { ENGINES, type EngineId } from '$lib/tts';
 	import { onTtsStat, sessionId, type TtsStat } from '$lib/tts/telemetry';
 
@@ -59,13 +60,14 @@
 <div class="border border-border p-3 text-[11px] text-muted-foreground {className}">
 	<div class="flex items-center justify-between">
 		<p class="tracking-widest uppercase">Telemetry</p>
-		<button
-			type="button"
-			class="text-primary hover:underline"
+		<Button
+			variant="link"
+			size="xs"
+			class="h-auto p-0 text-[11px] font-normal"
 			onclick={() => (telemetry.current = [])}
 		>
 			Clear
-		</button>
+		</Button>
 	</div>
 	{#if telemetry.current.length === 0}
 		<p class="mt-1.5 text-muted-foreground/70">No measurements yet — press Play.</p>

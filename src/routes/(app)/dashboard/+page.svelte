@@ -10,6 +10,7 @@
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import MessageCard from '$lib/components/inbox/message-card.svelte';
 	import MessageView from '$lib/components/inbox/message-view.svelte';
@@ -33,6 +34,12 @@
 	let category = $state<string>('all');
 	let priority = $state<'all' | 'high' | 'unorganized'>('all');
 	let busy = $state<null | 'connect' | 'sync' | 'organize'>(null);
+
+	const PRIORITY_OPTIONS = [
+		{ value: 'all', label: 'Any priority' },
+		{ value: 'high', label: 'Priority 4–5' },
+		{ value: 'unorganized', label: 'Not organized' }
+	];
 	/** Snapshot of the open message — a list refetch can never blank the dialog. */
 	let selectedItem = $state<InboxItem | null>(null);
 
@@ -69,6 +76,11 @@
 	function openFullPage() {
 		if (!selectedItem) return;
 		void goto(`/inbox/${selectedItem.id}`);
+	}
+
+	/** Narrow the Select's free string back to the filter union. */
+	function setPriority(next: string) {
+		if (next === 'all' || next === 'high' || next === 'unorganized') priority = next;
 	}
 
 	const filter = $derived<InboxFilter>({
@@ -164,15 +176,21 @@
 				<Input class="pl-8" placeholder="Search subject, sender…" bind:value={search} />
 			</div>
 
-			<select
-				class="h-8 border border-input bg-background px-2 text-sm"
-				bind:value={priority}
-				aria-label="Filter by priority"
+			<Select.Root
+				type="single"
+				items={PRIORITY_OPTIONS}
+				value={priority}
+				onValueChange={setPriority}
 			>
-				<option value="all">Any priority</option>
-				<option value="high">Priority 4–5</option>
-				<option value="unorganized">Not organized</option>
-			</select>
+				<Select.Trigger class="w-44" aria-label="Filter by priority">
+					<Select.Value placeholder="Any priority" />
+				</Select.Trigger>
+				<Select.Content>
+					{#each PRIORITY_OPTIONS as option (option.value)}
+						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
 		</div>
 
 		<Tabs.Root class="mt-3" bind:value={category}>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import { CATEGORY_LABELS, type InboxItem } from '$lib/types/mail';
 	import FactsChips from './facts-chips.svelte';
 
@@ -26,9 +27,9 @@
 					: 'outline';
 </script>
 
-<button
-	type="button"
-	class="w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none {selected
+<Button
+	variant="ghost"
+	class="block h-auto w-full rounded-none border-b border-border px-4 py-3 text-left font-normal transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none {selected
 		? 'bg-muted'
 		: ''}"
 	{onclick}
@@ -82,4 +83,4 @@
 			<FactsChips facts={item.facts} />
 		</div>
 	</div>
-</button>
+</Button>

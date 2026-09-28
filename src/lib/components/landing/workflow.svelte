@@ -12,6 +12,7 @@
 	import { linear } from 'svelte/easing';
 	import { fly } from 'svelte/transition';
 	import { untrack } from 'svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 
 	/**
@@ -105,13 +106,15 @@
 		<ol class="mt-6 space-y-1">
 			{#each steps as s, i (s.title)}
 				<li>
-					<button
-						type="button"
+					<Button
+						variant="ghost"
 						onclick={() => choose(i)}
 						aria-current={i === step ? 'step' : undefined}
 						class={cn(
-							'group flex w-full items-start gap-3 px-3 py-3 text-left motion-safe:transition-colors motion-safe:duration-300',
-							i === step ? 'bg-accent' : 'hover:bg-muted/60'
+							'group h-auto w-full items-start gap-3 rounded-none px-3 py-3 text-left font-normal motion-safe:transition-colors motion-safe:duration-300',
+							i === step
+								? 'bg-accent hover:bg-accent dark:hover:bg-accent'
+								: 'hover:bg-muted/60 dark:hover:bg-transparent'
 						)}
 					>
 						<span
@@ -143,7 +146,7 @@
 								{s.body}
 							</span>
 						</span>
-					</button>
+					</Button>
 				</li>
 			{/each}
 		</ol>
