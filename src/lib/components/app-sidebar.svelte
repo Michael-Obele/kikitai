@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AudioLines, Inbox, LogOut, Settings } from '@lucide/svelte';
+	import { AudioLines, ClipboardPaste, Inbox, LogOut, Settings } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
@@ -8,10 +8,21 @@
 
 	let { user }: { user: { name: string; email: string; image?: string | null } } = $props();
 
-	const items = [
-		{ title: 'Inbox', url: '/dashboard', icon: Inbox },
-		{ title: 'Digest', url: '/digest', icon: AudioLines },
-		{ title: 'Settings', url: '/settings', icon: Settings }
+	/** Labeled groups: the app itself, then the public routes outside (app). */
+	const groups = [
+		{
+			label: 'Listen',
+			items: [
+				{ title: 'Inbox', url: '/dashboard', icon: Inbox },
+				{ title: 'Digest', url: '/digest', icon: AudioLines },
+				{ title: 'Settings', url: '/settings', icon: Settings }
+			]
+		},
+		{
+			/** Works without an account — opens in the public shell, not this one. */
+			label: 'Public',
+			items: [{ title: 'Paste & read', url: '/read', icon: ClipboardPaste }]
+		}
 	] as const;
 
 	const initials = $derived(
@@ -43,25 +54,27 @@
 	</Sidebar.Header>
 
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>Listen</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					{#each items as item (item.url)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton isActive={page.url.pathname.startsWith(item.url)}>
-								{#snippet child({ props })}
-									<a href={resolve(item.url)} {...props}>
-										<item.icon />
-										<span>{item.title}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
+		{#each groups as group (group.label)}
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
+				<Sidebar.GroupContent>
+					<Sidebar.Menu>
+						{#each group.items as item (item.url)}
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton isActive={page.url.pathname.startsWith(item.url)}>
+									{#snippet child({ props })}
+										<a href={resolve(item.url)} {...props}>
+											<item.icon />
+											<span>{item.title}</span>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.GroupContent>
+			</Sidebar.Group>
+		{/each}
 	</Sidebar.Content>
 
 	<Sidebar.Footer>

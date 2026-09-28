@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { ArrowRight, AudioLines, Menu } from '@lucide/svelte';
+	import { ArrowRight, AudioLines, LayoutDashboard, Menu } from '@lucide/svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
@@ -25,6 +25,9 @@
 
 	let menuOpen = $state(false);
 	const closeMenu = () => (menuOpen = false);
+
+	/** Signed-in visitors get a way back into the app instead of Sign in / Connect. */
+	let { signedIn = false }: { signedIn?: boolean } = $props();
 </script>
 
 <header
@@ -49,7 +52,13 @@
 
 			<ThemeToggle />
 
-			{#if !onLogin}
+			{#if signedIn}
+				<div class="hidden items-center gap-1 sm:flex">
+					<Button size="sm" href={resolve('/dashboard')}>
+						<LayoutDashboard class="size-3.5" /> Dashboard
+					</Button>
+				</div>
+			{:else if !onLogin}
 				<div class="hidden items-center gap-1 sm:flex">
 					<Button variant="ghost" size="sm" href={resolve('/login')}>Sign in</Button>
 					<Button size="sm" href={resolve('/login')}>
@@ -100,7 +109,13 @@
 							{/if}
 						</nav>
 
-						{#if !onLogin}
+						{#if signedIn}
+							<div class="mt-auto grid gap-2 border-t border-border p-4">
+								<Button href={resolve('/dashboard')} onclick={closeMenu}>
+									<LayoutDashboard class="size-3.5" /> Dashboard
+								</Button>
+							</div>
+						{:else if !onLogin}
 							<div class="mt-auto grid gap-2 border-t border-border p-4">
 								<Button variant="outline" href={resolve('/login')} onclick={closeMenu}>
 									Sign in
