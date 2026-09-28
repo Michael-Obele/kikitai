@@ -5,6 +5,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
+	import * as Select from '$lib/components/ui/select';
 	import { Switch } from '$lib/components/ui/switch';
 	import Player from '$lib/components/player/player.svelte';
 	import { getAccountStatus, saveSettings, saveVoiceSpeed } from '$lib/remote';
@@ -32,15 +33,39 @@
 	const voices = $derived(meta.voices);
 	const status = getAccountStatus();
 
-	function engineChanged(event: Event) {
-		const next = (event.currentTarget as HTMLSelectElement).value as EngineId;
-		engine = next;
-		voice = ENGINES[next].defaultVoice;
+	/**
+	 * Remote-form field props. The shadcn Select renders a hidden input carrying
+	 * `name`, so FormData still holds the value on submit; aria-invalid rides on
+	 * the trigger.
+	 */
+	const engineField = saveSettings.fields.ttsEngine.as('select');
+	const voiceField = saveSettings.fields.ttsVoice.as('select');
+	const baseUrlField = saveSettings.fields.aiBaseUrl.as('text');
+	const modelField = saveSettings.fields.aiModel.as('text');
+	const keyField = saveSettings.fields.aiKey.as('text');
+	const syncWindowField = saveSettings.fields.syncWindowDays.as('number');
+	const engineItems = Object.values(ENGINES).map((option) => ({
+		value: option.id,
+		label: option.label
+	}));
+	const voiceItems = $derived(voices.map((name) => ({ value: name, label: name })));
+	const speedItems = SPEED_STEPS.map((step) => ({ value: String(step), label: `${step}×` }));
+
+	/** Picking an engine re-seeds the voice before the form submits both. */
+	function engineChanged(next: string) {
+		if (!next || next === engine) return;
+		engine = next as EngineId;
+		voice = ENGINES[engine].defaultVoice;
+	}
+
+	function pickVoice(next: string) {
+		if (next) voice = next;
 	}
 
 	/** Speed/ramp apply instantly (menu-style toggles, not form inputs). */
-	function speedChanged(event: Event) {
-		speed = Number((event.currentTarget as HTMLSelectElement).value);
+	function speedChanged(next: string) {
+		if (!next) return;
+		speed = Number(next);
 		void saveVoiceSpeed({ speed, ramp: rampOn }).catch(() => {});
 	}
 
@@ -76,7 +101,8 @@
 					<Label for="aiBaseUrl">Base URL</Label>
 					<Input
 						id="aiBaseUrl"
-						{...saveSettings.fields.aiBaseUrl.as('text')}
+						name={baseUrlField.name}
+						aria-invalid={baseUrlField['aria-invalid']}
 						placeholder="https://api.openai.com/v1"
 						bind:value={aiBaseUrl}
 					/>
@@ -86,7 +112,8 @@
 					<Label for="aiModel">Model</Label>
 					<Input
 						id="aiModel"
-						{...saveSettings.fields.aiModel.as('text')}
+						name={modelField.name}
+						aria-invalid={modelField['aria-invalid']}
 						placeholder="gpt-4o-mini · llama3.2 · openai/gpt-4o-mini"
 						bind:value={aiModel}
 					/>
@@ -96,7 +123,8 @@
 					<Label for="aiKey">API key</Label>
 					<Input
 						id="aiKey"
-						{...saveSettings.fields.aiKey.as('text')}
+						name={keyField.name}
+						aria-invalid={keyField['aria-invalid']}
 						type="password"
 						placeholder={data.settings.aiKeySet
 							? 'A key is saved — type to replace it'
@@ -124,33 +152,54 @@
 			<Card.Content class="space-y-4">
 				<div class="space-y-1.5">
 					<Label for="ttsEngine">Engine</Label>
-					<select
-						id="ttsEngine"
-						{...saveSettings.fields.ttsEngine.as('select')}
-						class="flex h-8 w-full border border-input bg-background px-2 text-sm"
+					<Select.Root
+						type="single"
+						name={engineField.name}
+						items={engineItems}
 						value={engine}
-						onchange={engineChanged}
+						onValueChange={engineChanged}
 					>
-						{#each Object.values(ENGINES) as option (option.id)}
-							<option value={option.id}>{option.label}</option>
-						{/each}
-					</select>
+						<Select.Trigger
+							id="ttsEngine"
+							class="w-full"
+							aria-invalid={engineField['aria-invalid']}
+						>
+							<Select.Value placeholder="Engine" />
+						</Select.Trigger>
+						<Select.Content>
+							{#each engineItems as option (option.value)}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
 					<p class="text-xs text-muted-foreground">{meta.note}</p>
 				</div>
 
 				{#if voices.length > 0}
 					<div class="space-y-1.5">
 						<Label for="ttsVoice">Voice</Label>
-						<select
-							id="ttsVoice"
-							{...saveSettings.fields.ttsVoice.as('select')}
-							class="flex h-8 w-full border border-input bg-background px-2 text-sm"
-							bind:value={voice}
+						<Select.Root
+							type="single"
+							name={voiceField.name}
+							items={voiceItems}
+							value={voice}
+							onValueChange={pickVoice}
 						>
-							{#each voices as option (option)}
-								<option value={option}>{option}</option>
-							{/each}
-						</select>
+							<Select.Trigger
+								id="ttsVoice"
+								class="w-full"
+								aria-invalid={voiceField['aria-invalid']}
+							>
+								<Select.Value placeholder="Voice" />
+							</Select.Trigger>
+							<Select.Content>
+								{#each voiceItems as option (option.value)}
+									<Select.Item value={option.value} label={option.label} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
 					</div>
 				{:else}
 					<p class="text-xs text-muted-foreground">
@@ -160,16 +209,23 @@
 
 				<div class="space-y-1.5">
 					<Label for="ttsSpeed">Speed</Label>
-					<select
-						id="ttsSpeed"
-						class="flex h-8 w-full border border-input bg-background px-2 text-sm"
+					<Select.Root
+						type="single"
+						items={speedItems}
 						value={String(speed)}
-						onchange={speedChanged}
+						onValueChange={speedChanged}
 					>
-						{#each SPEED_STEPS as step (step)}
-							<option value={String(step)}>{step}×</option>
-						{/each}
-					</select>
+						<Select.Trigger id="ttsSpeed" class="w-full">
+							<Select.Value placeholder="Speed" />
+						</Select.Trigger>
+						<Select.Content>
+							{#each speedItems as option (option.value)}
+								<Select.Item value={option.value} label={option.label}>
+									{option.label}
+								</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
 				</div>
 
 				<div class="flex items-center justify-between gap-3 border border-border p-3">
@@ -214,7 +270,9 @@
 					<Label for="syncWindowDays">Sync window (days)</Label>
 					<Input
 						id="syncWindowDays"
-						{...saveSettings.fields.syncWindowDays.as('number')}
+						name={syncWindowField.name}
+						aria-invalid={syncWindowField['aria-invalid']}
+						type="number"
 						min="1"
 						max="30"
 						class="w-28"
