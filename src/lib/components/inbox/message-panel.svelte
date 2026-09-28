@@ -66,9 +66,29 @@
 	let loadingThread = $state(false);
 	let loadingSpoken = $state(false);
 
-	/** The dialog swaps `item` without remounting — drop the previous message's AI state. */
+	/**
+	 * Cache key suffix unique to this panel instance: `clean_body` is write-once,
+	 * so a fetch made after a Simplify is always correct — while a shared cached
+	 * query entry read too early can stay stale until a full page reload. Stable
+	 * for the component's lifetime, so re-renders hit the cache instead of refetching.
+	 */
+	const loadKey = crypto.randomUUID();
+	async function loadFull(id: string) {
+		return getMessage(`${id}#${loadKey}`);
+	}
+
+	/**
+	 * The dialog swaps `item` without remounting — reset only when the message
+	 * itself changes. A same-id swap (Simplify/Re-organize saving a fresh row)
+	 * must keep the state that was just set, or the AI rewrite disappears the
+	 * moment it lands. Plain (untracked) variable, so the effect still depends
+	 * on `item.id` alone.
+	 */
+	let resetFor = '';
 	$effect(() => {
 		const id = item.id;
+		if (id === resetFor) return;
+		resetFor = id;
 		details = null;
 		thread = null;
 		spokenText = null;
@@ -79,7 +99,6 @@
 		loadingDetails = false;
 		loadingThread = false;
 		loadingSpoken = false;
-		void id;
 	});
 
 	async function reorganize() {
@@ -141,8 +160,9 @@
 	async function simplify() {
 		simplifying = true;
 		try {
-			await simplifyMessage(item.id);
-			const fresh = await getMessage(item.id);
+			// The command answers with the stored row — reading it back through the
+			// query cache can lag behind until a full page reload.
+			const fresh = await simplifyMessage(item.id);
 			simplified = fresh.cleanBody;
 			onsaved?.(fresh);
 		} catch (error) {
@@ -210,7 +230,7 @@
 		{/if}
 	</section>
 
-	{#await getMessage(item.id)}
+	{#await loadFull(item.id)}
 		<div class="flex items-center gap-2 text-sm text-muted-foreground">
 			<LoaderCircle class="size-4 animate-spin" /> Loading message…
 		</div>

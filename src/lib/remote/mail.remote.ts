@@ -233,7 +233,10 @@ export const getInbox = query(inboxFilterSchema, async (filter): Promise<InboxIt
 	return rows.map(toInboxItem);
 });
 
-export const getMessage = query(v.string(), async (id): Promise<MessageDto> => {
+export const getMessage = query(v.string(), async (arg): Promise<MessageDto> => {
+	// Callers may append `#<nonce>` to bust the client-side query cache — the
+	// message panel does after a Simplify, so it never reads a stale cached row.
+	const id = arg.split('#')[0];
 	const { user } = await requireUser();
 	const accountIds = await ownedAccountIds(user.id);
 	const [row] = await db
@@ -256,7 +259,7 @@ export const getMessage = query(v.string(), async (id): Promise<MessageDto> => {
  * AI call on a body, and `cleanedBody` stores the result, so each message is
  * simplified at most once ever (a failure retries next time, nothing wasted).
  */
-export const simplifyMessage = command(v.string(), async (id): Promise<{ id: string }> => {
+export const simplifyMessage = command(v.string(), async (id): Promise<MessageDto> => {
 	const { user } = await requireUser();
 	const accountIds = await ownedAccountIds(user.id);
 	const [row] = await db
@@ -268,7 +271,11 @@ export const simplifyMessage = command(v.string(), async (id): Promise<{ id: str
 	const clean = await cleanedBody(row, user.id);
 	if (!clean) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
 	void getMessage(id).refresh();
-	return { id };
+	// Answer with the stored row itself: the client's query cache can lag behind
+	// the single-flight refresh (it sometimes stays stale until a full reload), so
+	// the panel renders the rewrite straight from this return value.
+	const [fresh] = await db.select().from(message).where(eq(message.id, id));
+	return toMessageDto(fresh ?? { ...row, cleanBody: clean, cleanedAt: new Date() });
 });
 
 /**
