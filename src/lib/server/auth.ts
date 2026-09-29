@@ -8,8 +8,17 @@ import { db } from '$lib/server/db';
 /** The one scope Kikitai needs: read-only Gmail access. Nothing else. */
 export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
+const trustedOrigins = [
+	env.ORIGIN,
+	...(env.TRUSTED_ORIGINS ?? '')
+		.split(',')
+		.map((s) => s.trim())
+		.filter(Boolean)
+].filter(Boolean) as string[];
+
 export const auth = betterAuth({
 	baseURL: env.ORIGIN,
+	trustedOrigins,
 	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: 'pg' }),
 	// Google is the ONLY sign-in method: a deployment left reachable on the internet must not be
