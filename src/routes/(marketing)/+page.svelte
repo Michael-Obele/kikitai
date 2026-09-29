@@ -6,6 +6,7 @@
 		ClipboardPaste,
 		Copy,
 		Cpu,
+		Dot,
 		HardDrive,
 		Lock,
 		Server,
@@ -308,9 +309,9 @@ bun run dev`;
 		<p>Kikitai (聞きたい) means “I want to hear it.”</p>
 		<p class="flex flex-wrap items-center gap-x-4 gap-y-1">
 			<span>gmail.readonly only</span>
-			<span class="text-border">·</span>
+			<Dot class="size-3 shrink-0 text-border" />
 			<span>no telemetry</span>
-			<span class="text-border">·</span>
+			<Dot class="size-3 shrink-0 text-border" />
 			<span>no cloud voice required</span>
 		</p>
 	</div>

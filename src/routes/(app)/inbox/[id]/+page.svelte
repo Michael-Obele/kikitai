@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowLeft, ExternalLink, LoaderCircle } from '@lucide/svelte';
+	import { ArrowLeft, Dot, ExternalLink, LoaderCircle } from '@lucide/svelte';
 	import type { PageProps } from './$types';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -12,6 +12,13 @@
 	let { params }: PageProps = $props();
 
 	const settings = getSettings();
+	/**
+	 * Read the query *reactively* instead of awaiting it in the template: a
+	 * speed/engine/voice save refreshes it, `{#await settings then cfg}` re-ran
+	 * and destroyed MessagePanel + Player mid-playback (Bug A / P0-B).
+	 * `current` keeps the last value through a refresh, so identity holds.
+	 */
+	const cfg = $derived(settings.current);
 	/** Set by the panel after Re-organize so the header badge/summary stay in sync. */
 	let override = $state<MessageDto | null>(null);
 </script>
@@ -37,7 +44,7 @@
 			<div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 				<span>{item.fromName || item.fromEmail}</span>
 				{#if item.fromName && item.fromEmail}
-					<span>· {item.fromEmail}</span>
+					<span class="inline-flex items-center gap-1"><Dot class="size-3 shrink-0 text-muted-foreground" />{item.fromEmail}</span>
 				{/if}
 				<time datetime={item.receivedAt.toISOString()}>
 					{item.receivedAt.toLocaleString(undefined, {
@@ -51,7 +58,7 @@
 			</div>
 
 			<div class="mt-6">
-				{#await settings then cfg}
+				{#if cfg}
 					<MessagePanel
 						{item}
 						engine={cfg.ttsEngine as EngineId}
@@ -60,7 +67,7 @@
 						ramp={cfg.ttsRamp}
 						onsaved={(fresh) => (override = fresh)}
 					/>
-				{/await}
+				{/if}
 			</div>
 
 			<div class="mt-6 flex justify-end border-t border-border pt-4">

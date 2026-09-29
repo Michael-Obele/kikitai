@@ -28,3 +28,4 @@ docs/plans/*
 .playwright-mcp/
 .tmp-*
 .playwright-mcp/*
+.fallow/

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import {
+		ArrowRight,
 		AudioLines,
 		Check,
 		Cpu,
 		MailOpen,
+		Minus,
 		ShieldCheck,
 		Sparkles,
 		WandSparkles
@@ -168,7 +170,7 @@
 								Read your email messages
 							</li>
 							<li class="flex items-start gap-2 text-muted-foreground">
-								<span class="mt-0.5 size-3.5 shrink-0 text-center text-xs">–</span>
+								<Minus class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
 								Send, delete, or change anything
 							</li>
 						</ul>
@@ -182,8 +184,8 @@
 							<div class="flex items-center gap-3 border p-3" style="opacity: {1 - i * 0.22}">
 								<span class="size-1.5 shrink-0 bg-primary"></span>
 								<p class="min-w-0 flex-1 truncate text-sm">{subject}</p>
-								<span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-									body → text
+								<span class="inline-flex shrink-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
+									body <ArrowRight class="size-3" /> text
 								</span>
 							</div>
 						{/each}

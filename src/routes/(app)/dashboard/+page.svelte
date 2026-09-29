@@ -92,6 +92,8 @@
 	const inbox = $derived(getInbox(filter));
 	const status = getAccountStatus();
 	const settings = getSettings();
+	/** Reactive read — `{#await settings}` remounted the dialog's player on every refresh (Bug A / P0-B). */
+	const cfg = $derived(settings.current);
 
 	async function run(action: 'connect' | 'sync' | 'organize') {
 		busy = action;
@@ -277,8 +279,8 @@
 					</div>
 				{/if}
 
-				<!-- Rendered outside the inbox {#await} so a refetch never unmounts it. -->
-				{#await settings then cfg}
+				<!-- Rendered outside the inbox {#await}, with settings read via .current, so a refresh never unmounts it. -->
+				{#if cfg}
 					<MessageView
 						{open}
 						item={selectedItem}
@@ -290,7 +292,7 @@
 						onfullpage={openFullPage}
 						onsaved={(fresh) => (selectedItem = fresh)}
 					/>
-				{/await}
+				{/if}
 			{:catch error}
 				<p class="p-6 text-sm text-destructive">{errorMessage(error)}</p>
 			{/await}

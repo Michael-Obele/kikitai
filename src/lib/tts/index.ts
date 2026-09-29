@@ -1,8 +1,8 @@
-import { env } from '$env/dynamic/public';
 import { synthesize } from '$lib/remote';
 import { recordTts, sessionId } from './telemetry';
-import { seedKittenModel } from './model-cache';
 import { chunkKey, loadAudio, saveAudio } from './audio-cache';
+import { localGen } from './local-gen';
+import { speakable } from './pronunciation';
 
 export type EngineId = 'kitten' | 'kokoro' | 'webspeech' | 'google' | 'minimax';
 
@@ -81,228 +81,28 @@ export function downloadEstimate(engine: EngineId): number {
 	return ENGINES[engine].downloadMb;
 }
 
-const TTS_MODELS = {
-	kitten: 'KittenML/kitten-tts-nano-0.8',
-	kokoro: 'onnx-community/Kokoro-82M-v1.0-ONNX'
-} as const;
-
 /** Fixed speed steps offered in the UI (multiplier over natural speech). */
 export const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3] as const;
 export const DEFAULT_SPEED = 1;
 
-/**
- * Package paths appended to the CDN base. The `/+esm` suffix asks jsDelivr for
- * its browser-condition build: plain esm.sh injects an unenv `process` shim
- * (`versions.node = "22.14.0"`), so the loaders take their Node branch and die
- * on `fs.mkdirSync` — "[unenv] fs.mkdirSync is not implemented yet!".
+/*
+ * ONNX Runtime priming, the model loaders, `releaseOther` and the model
+ * promises moved to `engine-loader.ts` — the generation worker imports them
+ * too, and `local-gen.ts` picks the worker (or the inline fallback) and records
+ * the load timings on this side of the boundary.
  */
-const TTS_MODULES = {
-	kitten: 'kitten-tts-js@0.1.2/+esm',
-	kokoro: 'kokoro-js@1.2.1/+esm'
-} as const;
-
-/** Base URL of an npm CDN serving `<base>/<package>/+esm` (jsDelivr-style). */
-const cdn = () => (env.PUBLIC_TTS_CDN || 'https://cdn.jsdelivr.net/npm').replace(/\/$/, '');
-
-/**
- * kitten's jsDelivr build derives `ort.env.wasm.wasmPaths` from its own
- * immutable npm path (`…/kitten-tts-js@0.1.2/src/`), which ships no ONNX
- * Runtime files → 404 on `ort-wasm-simd-threaded.jsep.mjs` → "no available
- * backend found". It only assigns that value when unset, and jsDelivr rewrites
- * its bare `onnxruntime-web` import to this exact URL — so import it first and
- * point `wasmPaths` at the package's real `dist/` (a URL prefix, per ONNX
- * Runtime's `Env.WebAssemblyFlags.wasmPaths`).
- */
-const ORT_MODULE: string = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/+esm';
-const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.2/dist/';
-
-async function primeOnnxRuntime(): Promise<void> {
-	try {
-		const ort = await import(/* @vite-ignore */ ORT_MODULE);
-		ort.env.wasm.wasmPaths = ORT_DIST;
-		// Multi-threaded WASM needs cross-origin isolation (COOP/COEP). Without it
-		// ORT silently runs on ONE core — the main reason generation crawls.
-		if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) {
-			ort.env.wasm.numThreads = Math.max(1, navigator.hardwareConcurrency || 1);
-		}
-	} catch {
-		/* kitten's own import decides — same behaviour as before this fix */
-	}
-}
-
-let kitten: Promise<{
-	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
-	/** Frees the ONNX session — kitten's README calls this out for model switching. */
-	release?: () => void;
-}> | null = null;
-let kokoro: Promise<{
-	generate: (text: string, opts?: { voice?: string; speed?: number }) => Promise<GeneratedAudio>;
-}> | null = null;
-
-type GeneratedAudio = {
-	/** Kitten hands back a ready-made helper; kokoro-js returns raw PCM instead. */
-	toAudioBuffer?: (ctx: AudioContext) => AudioBuffer;
-	/** Kitten's samples. */
-	data?: Float32Array;
-	/** kokoro-js's samples, under a different name. */
-	audio?: Float32Array;
-	sampling_rate?: number;
-};
-
-/**
- * Both engines, one AudioBuffer. Kokoro's result has no `toAudioBuffer`, and
- * calling it anyway throws mid-`prepare` — which used to strand the player on
- * "playing" forever with nothing ever spoken.
- */
-function toBuffer(generated: GeneratedAudio, context: AudioContext): AudioBuffer {
-	if (generated.toAudioBuffer) return generated.toAudioBuffer(context);
-	const samples = generated.data ?? generated.audio;
-	if (!samples?.length) throw new Error('The voice engine returned no audio samples.');
-	const buffer = context.createBuffer(1, samples.length, generated.sampling_rate ?? 24000);
-	// `set` (not `copyToChannel`) so the typed-array variance stays version-agnostic.
-	buffer.getChannelData(0).set(samples);
-	return buffer;
-}
-
-async function loadKitten() {
-	if (!kitten) {
-		const started = performance.now();
-		let mirrored = false;
-		let fetchMs = 0;
-		// Phase marks behind the card's single load number: seed (mirror/cache),
-		// prime (ONNX runtime + WASM), mod (CDN module import), model (weights
-		// parse + session create). Answers "why is load 6–8 s" without guessing.
-		let seedMs = 0;
-		let primeMs = 0;
-		let modMs = 0;
-		let modelMs = 0;
-		kitten = seedKittenModel()
-			.catch(() => ({ ok: false, fetchMs: 0 }))
-			.then((seeded) => {
-				mirrored = seeded.ok;
-				fetchMs = Math.round(seeded.fetchMs);
-				seedMs = Math.round(performance.now() - started);
-				const t = performance.now();
-				return primeOnnxRuntime().finally(() => {
-					primeMs = Math.round(performance.now() - t);
-				});
-			})
-			.then(() => {
-				const t = performance.now();
-				return import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kitten}`).finally(() => {
-					modMs = Math.round(performance.now() - t);
-				});
-			})
-			.then((mod: any) => {
-				const t = performance.now();
-				return mod.KittenTTS.from_pretrained(TTS_MODELS.kitten).finally(() => {
-					modelMs = Math.round(performance.now() - t);
-				});
-			})
-			.then((model) => {
-				recordTts({
-					engine: 'kitten',
-					kind: 'load',
-					ms: performance.now() - started,
-					mirror: mirrored,
-					fetchMs,
-					phases: { seed: seedMs, prime: primeMs, mod: modMs, model: modelMs },
-					session: sessionId,
-					at: Date.now()
-				});
-				return model;
-			});
-	}
-	return kitten;
-}
-
-async function loadKokoro() {
-	if (!kokoro) {
-		const started = performance.now();
-		// WebGPU wants fp32 (kokoro-js recommends it; int8 is the slow path on GPU).
-		// fp32+WASM measured RTF ~1.6 here — too slow to keep up with playback.
-		const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
-		let modMs = 0;
-		let modelMs = 0;
-		const importMod = () => {
-			const t = performance.now();
-			return import(/* @vite-ignore */ `${cdn()}/${TTS_MODULES.kokoro}`).finally(() => {
-				modMs = Math.round(performance.now() - t);
-			});
-		};
-		kokoro = importMod()
-			.then((mod: any) => {
-				const t = performance.now();
-				return mod.KokoroTTS.from_pretrained(
-					TTS_MODELS.kokoro,
-					gpu ? { dtype: 'fp32', device: 'webgpu' } : { dtype: 'q8', device: 'wasm' }
-				)
-					.catch(async (error: unknown) => {
-						// 310MB of fp32 does not fit in every browser's WASM heap — drop to the
-						// 90MB build rather than leaving the player dead with "no available backend".
-						if (!gpu || !/out of memory|no available backend|Aborted/i.test(String(error)))
-							throw error;
-						console.warn('[tts] fp32/WebGPU would not load — retrying the 90MB WASM build', error);
-						const mod = await importMod();
-						return mod.KokoroTTS.from_pretrained(TTS_MODELS.kokoro, {
-							dtype: 'q8',
-							device: 'wasm'
-						});
-					})
-					.finally(() => {
-						modelMs = Math.round(performance.now() - t);
-					});
-			})
-			.then((model) => {
-				recordTts({
-					engine: 'kokoro',
-					kind: 'load',
-					ms: performance.now() - started,
-					phases: { mod: modMs, model: modelMs },
-					session: sessionId,
-					at: Date.now()
-				});
-				return model;
-			});
-	}
-	return kokoro;
-}
-
-/**
- * One model in memory at a time. Switching engines used to keep both ONNX
- * sessions alive — kitten's session plus kokoro's fp32 weights (310MB on disk,
- * roughly 1GB resident) across two separate ONNX runtimes — and the WASM heap
- * died on smaller machines with `no available backend found … out of memory`.
- * A reload only hid it, because a reload resets the heaps.
- */
-async function releaseOther(current: EngineId): Promise<void> {
-	if (current === 'kitten') {
-		const pending = kokoro;
-		kokoro = null;
-		if (!pending) return;
-		try {
-			// kokoro-js exposes no release: dropping the last reference is the free.
-			await (pending as Promise<{ dispose?: () => void }>).then((m) => m.dispose?.());
-		} catch {
-			/* session already gone */
-		}
-		return;
-	}
-	const pending = kitten;
-	kitten = null;
-	if (!pending) return;
-	try {
-		(await pending).release?.();
-	} catch {
-		/* session already gone */
-	}
-}
 
 export async function warmUp(engine: EngineId): Promise<void> {
+	const gen = localGen();
 	// Free the engine we're leaving *before* the next one allocates its heap.
-	await releaseOther(engine);
-	if (engine === 'kitten') await loadKitten();
-	else if (engine === 'kokoro') await loadKokoro();
+	if (engine === 'kitten' || engine === 'kokoro') {
+		await gen.release(engine === 'kitten' ? 'kokoro' : 'kitten');
+		await gen.load(engine);
+		return;
+	}
+	// Web Speech / cloud engines keep no model resident — release both.
+	await gen.release('kitten');
+	await gen.release('kokoro');
 }
 
 // ---------------------------------------------------------------- playback --
@@ -426,11 +226,14 @@ export type PreparedSpeech = {
 };
 
 /**
- * Chunks whose duration only reveals itself while playing (Web Speech, cloud
- * MP3): English runs at roughly 14 characters a second, and `speed` scales that.
+ * Characters a second of speech actually carries — measured at ~17.5; the old
+ * 14 made every estimate drift long. Drives word-highlight timing for engines
+ * that never report a duration, and the “time left” readout in the player.
  */
-const estimateMs = (text: string, speed: number) =>
-	Math.round((text.length / (14 * Math.max(0.25, speed))) * 1000);
+export const CHARS_PER_SECOND = 17.5;
+
+export const estimateMs = (text: string, speed: number) =>
+	Math.round((text.length / (CHARS_PER_SECOND * Math.max(0.25, speed))) * 1000);
 
 /**
  * Generate one chunk *without* playing it — the lookahead half of the player.
@@ -444,7 +247,9 @@ export async function prepare(
 	speed: number = DEFAULT_SPEED
 ): Promise<PreparedSpeech> {
 	stopped = false;
-	const clean = text.trim();
+	// The reader's say-as rules rewrite the spoken copy only — what is on
+	// screen (and the chunk boundaries around it) never changes.
+	const clean = speakable(text.trim());
 	if (!clean) return { genMs: 0, chars: 0, audioMs: 0, play: async () => {} };
 
 	const started = performance.now();
@@ -469,9 +274,11 @@ export async function prepare(
 				await playBuffer(cachedBuffer);
 			};
 		} else {
-			const model = engine === 'kitten' ? await loadKitten() : await loadKokoro();
-			const generated = await model.generate(clean, { voice: voiceName, speed });
-			const buffer = toBuffer(generated, context);
+			// Inference happens in the worker — the main thread only moves PCM.
+			const { samples, sampleRate } = await localGen().generate(engine, voiceName, clean, speed);
+			const buffer = context.createBuffer(1, samples.length, sampleRate);
+			// `set` (not `copyToChannel`) so the typed-array variance stays version-agnostic.
+			buffer.getChannelData(0).set(samples);
 			// Local engines know exactly how long the audio is.
 			audioMs = Math.round(buffer.duration * 1000);
 			void saveAudio(key, buffer.getChannelData(0), buffer.sampleRate);

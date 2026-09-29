@@ -1,5 +1,3 @@
-import { env } from '$env/dynamic/public';
-
 /**
  * Pre-seed the Cache API slot that `kitten-tts-js@0.1.2` reads *before* it
  * fetches anything, so a first Play never waits on HuggingFace.
@@ -11,6 +9,9 @@ import { env } from '$env/dynamic/public';
  *
  * Any failure returns false and `from_pretrained` downloads as it always did —
  * the mirror can only ever make things faster.
+ *
+ * The base URL is a parameter: the worker bundle cannot read `$env`, so the
+ * caller passes `PUBLIC_TTS_MODEL_BASE` in.
  */
 const CACHE_NAME = 'kitten-tts';
 const REPO = 'KittenML/kitten-tts-nano-0.8';
@@ -71,8 +72,8 @@ async function fetchBytes(base: string, file: string): Promise<ArrayBuffer> {
 
 export type SeedResult = { ok: boolean; fetchMs: number };
 
-export async function seedKittenModel(): Promise<SeedResult> {
-	const base = env.PUBLIC_TTS_MODEL_BASE?.replace(/\/$/, '');
+export async function seedKittenModel(modelBase?: string): Promise<SeedResult> {
+	const base = modelBase?.replace(/\/$/, '');
 	if (!base || typeof caches === 'undefined') return { ok: false, fetchMs: 0 };
 
 	const started = performance.now();

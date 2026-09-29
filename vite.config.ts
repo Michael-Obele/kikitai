@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import adapterNetlify from '@sveltejs/adapter-netlify';
 import adapterNode from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 /** Build target: `node` (local + Docker) or `netlify` (Netlify deploy). */
 type AdapterTarget = 'node' | 'netlify';
@@ -27,9 +27,36 @@ if (target !== 'node' && target !== 'netlify') {
 
 const adapter = target === 'netlify' ? adapterNetlify() : adapterNode();
 
+/**
+ * Dev-only, and it exists because Vite does *not* inline `?worker&inline`
+ * during `vite dev` — the wrapper it emits is `new Worker("/src/…?worker_file")`.
+ * The page is cross-origin isolated (COOP/COEP from `hooks.server.ts`, needed
+ * for SharedArrayBuffer and ONNX's multi-threaded WASM), and Chrome refuses a
+ * worker whose script response carries none of the isolation headers:
+ * `net::ERR_BLOCKED_BY_RESPONSE`. Vite answers that request before SvelteKit's
+ * `handle` runs, so `hooks.server.ts` never gets the chance to stamp them —
+ * hence this middleware. Production inlines the worker as a blob URL and needs
+ * no headers at all.
+ */
+const workerIsolationHeaders = (): Plugin => ({
+	name: 'worker-isolation-headers',
+	configureServer(server) {
+		server.middlewares.use((req, res, next) => {
+			const url = req.url ?? '';
+			if (url.includes('worker_file') || url.includes('.worker.')) {
+				res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+				res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+				res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+			}
+			next();
+		});
+	}
+});
+
 export default defineConfig({
 	plugins: [
 		tailwindcss(),
+		workerIsolationHeaders(),
 		sveltekit({
 			// SvelteKit experimental flags (top-level `experimental` is split:
 			// SvelteKit flags go to `kit`, the rest to vite-plugin-svelte).
@@ -60,5 +87,15 @@ export default defineConfig({
 				}
 			}
 		})
-	]
+	],
+
+	/**
+	 * Dev-server reachability for containerized tools.
+	 *
+	 * The effing-use browser harness runs inside Docker and reaches this host
+	 * via `host.docker.internal` (IPv6 — the IPv4 docker bridge only allows
+	 * *published* ports through the firewall). Vite's host-check 403s any
+	 * unknown Host header, so it must be allow-listed here.
+	 */
+	server: { allowedHosts: ['host.docker.internal'] }
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AudioLines, Check, Inbox as InboxIcon, ListOrdered } from '@lucide/svelte';
+	import { ArrowRight, AudioLines, Check, Inbox as InboxIcon, ListOrdered } from '@lucide/svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import Player from '$lib/components/player/player.svelte';
@@ -9,6 +9,8 @@
 
 	const digest = getDigest();
 	const settings = getSettings();
+	/** Reactive read — `{#await settings}` remounted the Player on every refresh (Bug A / P0-B). */
+	const cfg = $derived(settings.current);
 
 	let playedIds = $state<string[]>([]);
 
@@ -57,7 +59,7 @@
 				</div>
 			</div>
 		{:else}
-			{#await settings then cfg}
+			{#if cfg}
 				<Card.Root class="mt-6">
 					<Card.Header class="flex-row items-center justify-between space-y-0">
 						<div class="flex items-center gap-2">
@@ -90,7 +92,7 @@
 						/>
 					</Card.Content>
 				</Card.Root>
-			{/await}
+			{/if}
 
 			<div class="mt-6 space-y-3">
 				{#each items as item, i (item.id)}
@@ -129,8 +131,8 @@
 								{#if item.actionItems.length > 0}
 									<ul class="mt-2 space-y-1">
 										{#each item.actionItems as action, i (i)}
-											<li class="flex gap-2 text-xs text-muted-foreground">
-												<span class="text-primary">→</span>{action}
+											<li class="flex items-center gap-2 text-xs text-muted-foreground">
+												<ArrowRight class="size-3 shrink-0 text-primary" />{action}
 											</li>
 										{/each}
 									</ul>

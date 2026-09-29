@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ArrowRight } from '@lucide/svelte';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { AreaChart } from 'layerchart';
 	import { prefersReducedMotion, Tween } from 'svelte/motion';
@@ -185,7 +186,7 @@
 		<div class="mt-4 flex items-baseline gap-4">
 			<p class="font-heading text-4xl italic tabular-nums">{totalAll}</p>
 			<span class="text-muted-foreground">minutes</span>
-			<span class="text-border">→</span>
+			<ArrowRight class="size-5 shrink-0 text-border" />
 			<p class="font-heading text-4xl text-primary italic tabular-nums">{totalDigest}</p>
 			<span class="text-muted-foreground">minutes</span>
 		</div>

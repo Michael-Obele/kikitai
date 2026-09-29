@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ExternalLink, Maximize2 } from '@lucide/svelte';
+	import { Dot, ExternalLink, Maximize2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -54,9 +54,9 @@
 				<Dialog.Description>
 					{item.fromName || item.fromEmail}
 					{#if item.fromName && item.fromEmail}
-						<span class="text-muted-foreground">· {item.fromEmail}</span>
+						<span class="inline-flex items-center gap-1 text-muted-foreground"><Dot class="size-3 shrink-0" />{item.fromEmail}</span>
 					{/if}
-					·
+					<Dot class="size-3 shrink-0 text-muted-foreground" />
 					{item.receivedAt.toLocaleString(undefined, {
 						dateStyle: 'medium',
 						timeStyle: 'short'

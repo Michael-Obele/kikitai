@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import {
+		ArrowRight,
 		AudioLines,
+		Dot,
 		ListTree,
 		LoaderCircle,
 		MessagesSquare,
@@ -181,8 +183,8 @@
 			{#if item.actionItems.length > 0}
 				<ul class="mt-2 space-y-1">
 					{#each item.actionItems as action, i (i)}
-						<li class="flex gap-2 text-xs text-muted-foreground">
-							<span class="text-primary">→</span>{action}
+						<li class="flex items-center gap-2 text-xs text-muted-foreground">
+							<ArrowRight class="size-3 shrink-0 text-primary" />{action}
 						</li>
 					{/each}
 				</ul>
@@ -210,7 +212,7 @@
 			<ul class="mt-2 space-y-1">
 				{#each details.keyPoints as point, i (i)}
 					<li class="flex gap-2 text-sm text-muted-foreground">
-						<span class="text-primary">→</span>{point}
+						<ArrowRight class="size-3.5 shrink-0 text-primary" />{point}
 					</li>
 				{/each}
 			</ul>
@@ -295,8 +297,8 @@
 					{#if thread.highlights.length > 0}
 						<ul class="mt-2 space-y-1">
 							{#each thread.highlights as highlight, i (i)}
-								<li class="flex gap-2 text-xs text-muted-foreground">
-									<span class="text-primary">·</span>{highlight}
+								<li class="flex items-center gap-2 text-xs text-muted-foreground">
+									<Dot class="size-4 shrink-0 text-primary" />{highlight}
 								</li>
 							{/each}
 						</ul>
