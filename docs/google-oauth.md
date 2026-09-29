@@ -74,7 +74,8 @@ on first sign-in.
 4. **Name**: anything, e.g. `kikitai-web`.
 5. **Authorized JavaScript origins** — leave empty (Kikitai is a server-side flow; Better Auth
    exchanges the code on the server).
-6. **Authorized redirect URIs** → **ADD URI**, exactly one:
+6. **Authorized redirect URIs** → **ADD URI** — one per origin you serve from
+   (Google allows many; add each exactly):
 
    ```text
    {ORIGIN}/api/auth/callback/google
@@ -82,7 +83,12 @@ on first sign-in.
 
    - Local dev: `http://localhost:5173/api/auth/callback/google`
      (match the port you actually run — see `ORIGIN` in `.env`).
-   - Production: `https://mail.example.com/api/auth/callback/google`
+   - Production: `https://<your-site>.netlify.app/api/auth/callback/google`
+   - Production: `https://<your-app>.svelte-apps.me/api/auth/callback/google`
+
+   Keep `ORIGIN` as the canonical one and list the other in `TRUSTED_ORIGINS`
+   (see `.env.example`) — Better Auth uses a dynamic baseURL allow-list so
+   callbacks work from either domain.
 
    Rules Google enforces here (a violation yields `redirect_uri_mismatch`): must be `https://` except
    on `localhost`, no raw IP addresses, no query string or `#fragment`, path included, port included
