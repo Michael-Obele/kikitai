@@ -54,7 +54,9 @@
 				<Dialog.Description>
 					{item.fromName || item.fromEmail}
 					{#if item.fromName && item.fromEmail}
-						<span class="inline-flex items-center gap-1 text-muted-foreground"><Dot class="size-3 shrink-0" />{item.fromEmail}</span>
+						<span class="inline-flex items-center gap-1 text-muted-foreground"
+							><Dot class="size-3 shrink-0" />{item.fromEmail}</span
+						>
 					{/if}
 					<Dot class="size-3 shrink-0 text-muted-foreground" />
 					{item.receivedAt.toLocaleString(undefined, {

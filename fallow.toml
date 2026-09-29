@@ -1,19 +1,66 @@
 # fallow.toml - Codebase analysis configuration
-# See https://docs.fallow.tools for documentation
+# See https://docs.fallow.tools/configuration for the full field reference.
 
-entry = ["src/index.{ts,tsx,js,jsx}", "src/main.{ts,tsx,js,jsx}"]
+# ---------------------------------------------------------------------------
+# Entry points
+# ---------------------------------------------------------------------------
+# The SvelteKit plugin already auto-detects `src/routes/**` as entry points, so
+# these are only the non-route roots (server hooks + anything loaded globally).
+entry = [
+    "src/hooks.server.ts",
+    "src/app.d.ts",
+    "src/routes/**/+layout.server.ts",
+    "src/routes/**/+page.server.ts",
+    "src/routes/**/+server.ts",
+]
+
+# ---------------------------------------------------------------------------
+# Vendored shadcn-svelte components  (src/lib/components/ui/**)
+# ---------------------------------------------------------------------------
+# `npx shadcn-svelte add <name>` drops registry files straight into this tree.
+# They are vendored, not hand-written, so we deliberately exclude the whole
+# folder from the checks that assume hand-written code:
+#
+#   * `ignoreExports`  - the documented fix for namespace barrels (many
+#                        `ui/<name>/index.ts` export `Root`, `Trigger`, `Content`,
+#                        ... on purpose) -> kills unused-export and the 5
+#                        duplicate-export findings.
+#   * `ignoreFindings` - keeps the files IN the module graph (so everything they
+#                        import stays reachable) but stops reporting findings for
+#                        them -> kills unused-file (an installed-but-not-yet
+#                        -rendered component is not dead code) and the
+#                        circular-dependency between `ui/<name>/index.ts` and
+#                        `ui/<name>/<name>.svelte`.
+#
+# Deliberately NOT an `ignorePatterns` entry: dropping these files from the graph
+# would make everything they import look unreachable and create *new* findings.
+ignoreExports = [{ file = "src/lib/components/ui/**", exports = ["*"] }]
+
+ignoreFindings = [
+    "src/lib/components/ui/**",
+    # SvelteKit `$lib` alias convention: placeholder file, nothing lives here yet.
+    "src/lib/index.ts",
+]
 
 [duplicates]
 # Hide pair-only clones; focus on widespread copy-paste worth refactoring.
 # Lower to 2 to report every duplicate pair.
 minOccurrences = 3
-# Common additions (uncomment to enable):
-# ignore = [
-#   "**/lib/**",          # for repos that publish transpiled output to lib/
-#   "**/legacy/**",       # for repos with legacy-build artifacts
-#   "**/__generated__/**", # Relay, GraphQL Code Generator
-#   "**/generated/**"     # OpenAPI, Protobuf codegen
-# ]
+# The shadcn `sidebar` component ships four near-identical action/button blocks.
+# We did not write them and we will not refactor upstream code.
+ignore = ["src/lib/components/ui/**"]
 
-# Per-issue-type severity: "error" (fail CI), "warn" (report only), "off" (ignore)
+[health]
+# Vendored components are large and complex by design (e.g. `ui/sidebar`).
+# Our own components still get reported, so the health report stays actionable.
+ignore = ["src/lib/components/ui/**"]
+
+# ---------------------------------------------------------------------------
+# Rules
+# ---------------------------------------------------------------------------
+# `dev-dependencies-in-production` is inapplicable to a bundled SvelteKit app:
+# the shipped artifact is `build/`, not an npm package that consumers install,
+# so the dependencies/devDependencies split carries no runtime meaning here.
+# Every other rule keeps its default severity.
 [rules]
+dev-dependencies-in-production = "off"

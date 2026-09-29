@@ -29,3 +29,8 @@ docs/plans/*
 .tmp-*
 .playwright-mcp/*
 .fallow/
+
+# Guardrail probes (persistent browser profile + run output)
+tests/.profile/
+test-results/
+playwright-report/

@@ -44,7 +44,9 @@
 			<div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 				<span>{item.fromName || item.fromEmail}</span>
 				{#if item.fromName && item.fromEmail}
-					<span class="inline-flex items-center gap-1"><Dot class="size-3 shrink-0 text-muted-foreground" />{item.fromEmail}</span>
+					<span class="inline-flex items-center gap-1"
+						><Dot class="size-3 shrink-0 text-muted-foreground" />{item.fromEmail}</span
+					>
 				{/if}
 				<time datetime={item.receivedAt.toISOString()}>
 					{item.receivedAt.toLocaleString(undefined, {

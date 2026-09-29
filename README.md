@@ -165,20 +165,20 @@ Things that behave differently on Netlify:
 
 ## Environment variables
 
-| Variable                               | Required        | Purpose                                                                |
-| -------------------------------------- | --------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                         | yes             | Postgres connection string                                             |
-| `BETTER_AUTH_SECRET`                   | yes             | session signing (`openssl rand -base64 32`)                            |
-| `AUTH_TOKEN_SECRET`                    | yes             | encrypts OAuth tokens + the AI key at rest                             |
-| `ORIGIN`                               | yes             | canonical public origin; Better Auth dynamic baseURL fallback          |
+| Variable                               | Required        | Purpose                                                                                             |
+| -------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | yes             | Postgres connection string                                                                          |
+| `BETTER_AUTH_SECRET`                   | yes             | session signing (`openssl rand -base64 32`)                                                         |
+| `AUTH_TOKEN_SECRET`                    | yes             | encrypts OAuth tokens + the AI key at rest                                                          |
+| `ORIGIN`                               | yes             | canonical public origin; Better Auth dynamic baseURL fallback                                       |
 | `TRUSTED_ORIGINS`                      | for 2nd domain  | comma-separated extra origins (`https://<your-site>.netlify.app,https://<your-app>.svelte-apps.me`) |
-| `GOOGLE_CLIENT_ID`                     | for mail        | your OAuth client                                                      |
-| `GOOGLE_CLIENT_SECRET`                 | for mail        | your OAuth client                                                      |
-| `AI_BASE_URL` / `AI_KEY` / `AI_MODEL`  | no              | defaults for the Settings form                                         |
-| `TTS_ENGINE`                           | no              | `kitten` (default) \| `kokoro` \| `webspeech` \| `google` \| `minimax` |
-| `GOOGLE_TTS_KEY`                       | for cloud voice | Google Cloud text-to-speech                                            |
-| `MINIMAX_API_KEY` / `MINIMAX_GROUP_ID` | for cloud voice | MiniMax                                                                |
-| `PUBLIC_TTS_CDN`                       | no              | npm CDN base (`<base>/<pkg>/+esm`) for the local engines               |
+| `GOOGLE_CLIENT_ID`                     | for mail        | your OAuth client                                                                                   |
+| `GOOGLE_CLIENT_SECRET`                 | for mail        | your OAuth client                                                                                   |
+| `AI_BASE_URL` / `AI_KEY` / `AI_MODEL`  | no              | defaults for the Settings form                                                                      |
+| `TTS_ENGINE`                           | no              | `kitten` (default) \| `kokoro` \| `webspeech` \| `google` \| `minimax`                              |
+| `GOOGLE_TTS_KEY`                       | for cloud voice | Google Cloud text-to-speech                                                                         |
+| `MINIMAX_API_KEY` / `MINIMAX_GROUP_ID` | for cloud voice | MiniMax                                                                                             |
+| `PUBLIC_TTS_CDN`                       | no              | npm CDN base (`<base>/<pkg>/+esm`) for the local engines                                            |
 
 ## Architecture
 

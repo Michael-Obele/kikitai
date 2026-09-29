@@ -13,10 +13,7 @@ const normalizeOrigin = (s: string) => s.trim().replace(/\/+$/, '');
 /** All public origins: canonical ORIGIN + comma-separated TRUSTED_ORIGINS. */
 const allOrigins = [
 	env.ORIGIN ? normalizeOrigin(env.ORIGIN) : '',
-	...(env.TRUSTED_ORIGINS ?? '')
-		.split(',')
-		.map(normalizeOrigin)
-		.filter(Boolean)
+	...(env.TRUSTED_ORIGINS ?? '').split(',').map(normalizeOrigin).filter(Boolean)
 ].filter(Boolean) as string[];
 
 const hostOf = (origin: string): string | null => {
