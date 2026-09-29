@@ -3,6 +3,7 @@
 		AudioLines,
 		Download,
 		LoaderCircle,
+		MoveVertical,
 		Pause,
 		Play,
 		SkipBack,
@@ -76,6 +77,14 @@
 
 	/** Remembered choice — works without an account (public /read) and offline. */
 	const prefs = new PersistedState('kikitai.player.prefs', { speed: 1, ramp: false });
+
+	/**
+	 * Keep the spoken chunk in view as the voice moves on. Off means the page
+	 * never fights a reader scrolling ahead through a long paste.
+	 * Own key (not inside `prefs`): old stored copies would miss the field and
+	 * read as "off" for everyone on upgrade.
+	 */
+	const autoScroll = new PersistedState('kikitai.player.follow', true);
 
 	/**
 	 * Cap + ramp. The first render matches the server (the remembered value
@@ -368,7 +377,7 @@
 	/** Long pastes scroll away — keep the spoken chunk in view, but only when it isn't. */
 	$effect(() => {
 		const current = sentenceIndex;
-		if (status !== 'playing' || !chunkList) return;
+		if (status !== 'playing' || !autoScroll.current || !chunkList) return;
 		chunkList
 			.querySelector(`[data-chunk="${current}"]`)
 			?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -405,9 +414,22 @@
 <div class={compact ? 'flex items-center gap-2' : 'space-y-4'}>
 	{#if !compact && current}
 		<div class="border border-border bg-card p-4">
-			<p class="text-xs tracking-widest text-muted-foreground uppercase">
-				{index + 1} / {items.length}
-			</p>
+			<div class="flex items-start justify-between gap-3">
+				<p class="text-xs tracking-widest text-muted-foreground uppercase">
+					{index + 1} / {items.length}
+				</p>
+				<Button
+					variant="ghost"
+					size="xs"
+					class="shrink-0 text-muted-foreground aria-pressed:bg-muted aria-pressed:text-foreground"
+					aria-pressed={autoScroll.current}
+					onclick={() => (autoScroll.current = !autoScroll.current)}
+					title="Keep the page following the voice as it reads"
+				>
+					<MoveVertical class="size-3.5" />
+					Auto-scroll {autoScroll.current ? 'on' : 'off'}
+				</Button>
+			</div>
 			{#if current.title}
 				<p class="mt-1 text-sm font-medium">{current.title}</p>
 			{/if}
