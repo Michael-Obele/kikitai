@@ -74,7 +74,9 @@
 			</div>
 
 			{#if item.summary}
-				<p class="mt-1.5 line-clamp-2 text-sm leading-snug text-muted-foreground">{item.summary}</p>
+				<p class="mt-1.5 line-clamp-2 text-sm leading-snug wrap-anywhere text-muted-foreground">
+					{item.summary}
+				</p>
 			{:else if item.organizeError}
 				<p class="mt-1.5 text-xs text-destructive">{item.organizeError}</p>
 			{:else}

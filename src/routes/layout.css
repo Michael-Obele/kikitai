@@ -3,6 +3,7 @@
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/oxanium';
 @import '@fontsource-variable/playfair-display';
+@import '@fontsource-variable/atkinson-hyperlegible-next';
 
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/forms';
@@ -49,6 +50,18 @@
 	   because foreground is near-white there and would blow out full-bleed. */
 	--band: var(--foreground);
 	--band-foreground: var(--background);
+	/*
+	 * Reading typography — the reader's text size, face and leading. The rule and
+	 * the reasoning live in `src/lib/reader-prefs.svelte.ts`; this is the copy
+	 * the server and the first frame paint, and `DEFAULT_READER_PREFS` there is
+	 * the same decision written for the client. Change both or neither.
+	 */
+	--reader-scale: 1;
+	--reader-size: calc(0.875rem * var(--reader-scale));
+	--reader-size-sm: calc(0.75rem * var(--reader-scale));
+	--reader-font: 'Oxanium Variable', sans-serif;
+	--reader-heading-font: 'Playfair Display Variable', serif;
+	--reader-leading: 1.625;
 }
 
 .dark {
@@ -156,4 +169,64 @@
 	html {
 		@apply font-sans;
 	}
+}
+/*
+ * The reading text itself: the face and the size the reading preference
+ * controls, and nothing else. Deliberately UNLAYERED — Tailwind's `text-*`,
+ * `font-*` and `leading-*` utilities live in a cascade layer, and an unlayered
+ * rule outranks every layer, so these win on any surface that opts in, with no
+ * `!important` and no specificity games.
+ *
+ * No `line-height` here, on purpose. The preference's leading belongs to running
+ * prose — the reader's blocks, a message body — and those call sites ask for it
+ * with `leading-[var(--reader-leading)]`. The smaller surfaces (the paste box,
+ * a footnote) keep `text-sm` / `text-xs` instead: those utilities carry a
+ * unitless ratio that scales with whatever font-size this class applies, so
+ * their line spacing is left exactly as it was.
+ *
+ * A surface opts in by dropping the `text-sm` / `text-xs` it used to carry.
+ * Everything inside (`p`, `li`, `blockquote`) inherits, which is why the reader
+ * needed one class rather than one per block.
+ *
+ * WRAPPING IS NOT DECIDED HERE, and that split is deliberate. Mail and pasted
+ * answers carry bare URLs, and an unbreakable token paints straight out of the
+ * box it sits in (measured before the fix: a URL 55px past the edge of a 716px
+ * column, over whatever sat beside it). Every element that renders text which
+ * can hold one therefore carries Tailwind's `wrap-anywhere` —
+ * `overflow-wrap: anywhere`, and not `break-word`, because it also counts
+ * mid-word breaks when working out intrinsic size, so a long token cannot widen
+ * its container either. That is the reader's blocks, a message body, the spoken
+ * line, plus the smaller AI-written prose this class does not size (summaries,
+ * action items, subjects, cards).
+ *
+ * It stays a per-element utility instead of a declaration here on purpose:
+ * these classes are unlayered, so they beat every Tailwind layer, and a
+ * `wrap-*` utility on the same element as `.reading` would therefore lose to it
+ * — silently. Wrapping goes on the element; size and face live here.
+ */
+.reading {
+	font-family: var(--reader-font);
+	font-size: var(--reader-size);
+}
+
+/* The live "now speaking" line is reading text too, one step smaller. */
+.reading-sm {
+	font-family: var(--reader-font);
+	font-size: var(--reader-size-sm);
+}
+
+/*
+ * Headings inside the reader follow the chosen face: the brand serif while the
+ * body is Oxanium, the reader's own face for every other choice.
+ */
+.reading-heading {
+	font-family: var(--reader-heading-font);
+}
+
+/*
+ * A scrolling window onto reading text (a message body). The window grows with
+ * the type, so a bigger size never shows less of the message.
+ */
+.reading-window {
+	max-height: calc(16rem * var(--reader-scale));
 }

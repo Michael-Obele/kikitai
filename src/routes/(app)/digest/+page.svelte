@@ -121,19 +121,21 @@
 							</div>
 
 							<div class="min-w-0 flex-1">
-								<p class="text-sm font-medium">{item.subject}</p>
+								<p class="text-sm font-medium wrap-anywhere">{item.subject}</p>
 								<p class="mt-0.5 text-xs text-muted-foreground">
 									{item.fromName || 'unknown sender'} · {item.receivedAt.toLocaleString(undefined, {
 										dateStyle: 'medium',
 										timeStyle: 'short'
 									})}
 								</p>
-								<p class="mt-2 text-sm text-muted-foreground">{item.summary}</p>
+								<p class="mt-2 text-sm wrap-anywhere text-muted-foreground">{item.summary}</p>
 								<FactsChips facts={item.facts} />
 								{#if item.actionItems.length > 0}
 									<ul class="mt-2 space-y-1">
 										{#each item.actionItems as action, i (i)}
-											<li class="flex items-center gap-2 text-xs text-muted-foreground">
+											<li
+												class="flex items-center gap-2 text-xs wrap-anywhere text-muted-foreground"
+											>
 												<ArrowRight class="size-3 shrink-0 text-primary" />{action}
 											</li>
 										{/each}

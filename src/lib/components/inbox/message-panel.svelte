@@ -30,6 +30,7 @@
 	import VoicePicker from '$lib/components/player/voice-picker.svelte';
 	import TelemetryCard from '$lib/components/player/telemetry-card.svelte';
 	import WordLine from '$lib/components/player/word-line.svelte';
+	import ReaderSettings from '$lib/components/reader/reader-settings.svelte';
 
 	let {
 		item,
@@ -179,11 +180,11 @@
 	{#if item.summary}
 		<div class="border-l-2 border-primary bg-primary/5 px-3 py-2">
 			<p class="text-xs tracking-widest text-primary uppercase">Summary</p>
-			<p class="mt-1 text-sm">{item.summary}</p>
+			<p class="mt-1 text-sm wrap-anywhere">{item.summary}</p>
 			{#if item.actionItems.length > 0}
 				<ul class="mt-2 space-y-1">
 					{#each item.actionItems as action, i (i)}
-						<li class="flex items-center gap-2 text-xs text-muted-foreground">
+						<li class="flex items-center gap-2 text-xs wrap-anywhere text-muted-foreground">
 							<ArrowRight class="size-3 shrink-0 text-primary" />{action}
 						</li>
 					{/each}
@@ -212,17 +213,17 @@
 		{#if details}
 			<ul class="mt-2 space-y-1">
 				{#each details.keyPoints as point, i (i)}
-					<li class="flex gap-2 text-sm text-muted-foreground">
+					<li class="flex gap-2 text-sm wrap-anywhere text-muted-foreground">
 						<ArrowRight class="size-3.5 shrink-0 text-primary" />{point}
 					</li>
 				{/each}
 			</ul>
-			<p class="mt-2 text-sm">
+			<p class="mt-2 text-sm wrap-anywhere">
 				<span class="text-xs tracking-widest text-muted-foreground uppercase">Asks of you</span>
 				{details.askOfYou}
 			</p>
 			{#if details.deadlines.length > 0}
-				<p class="mt-1 text-xs text-muted-foreground">
+				<p class="mt-1 text-xs wrap-anywhere text-muted-foreground">
 					Deadlines: {details.deadlines.join(' · ')}
 				</p>
 			{/if}
@@ -268,10 +269,14 @@
 				the overflow but never scroll it without a mouse. Svelte's heuristic
 				sees a plain div; the scroll container is the reason it has focus.
 			-->
+			<!--
+				`.reading-window` scales the box with the type: a bigger reading size
+				must not shrink how much of the message fits.
+			-->
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<div
 				tabindex="0"
-				class="max-h-64 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground"
+				class="reading reading-window overflow-y-auto leading-(--reader-leading) wrap-anywhere whitespace-pre-wrap text-muted-foreground"
 			>
 				{body}
 			</div>
@@ -302,11 +307,11 @@
 					Conversation · {thread?.messageCount ?? full.threadCount} messages
 				</h2>
 				{#if thread}
-					<p class="mt-2 text-sm">{thread.summary}</p>
+					<p class="mt-2 text-sm wrap-anywhere">{thread.summary}</p>
 					{#if thread.highlights.length > 0}
 						<ul class="mt-2 space-y-1">
 							{#each thread.highlights as highlight, i (i)}
-								<li class="flex items-center gap-2 text-xs text-muted-foreground">
+								<li class="flex items-center gap-2 text-xs wrap-anywhere text-muted-foreground">
 									<Dot class="size-4 shrink-0 text-primary" />{highlight}
 								</li>
 							{/each}
@@ -333,8 +338,11 @@
 			</section>
 		{/if}
 
-		<div class="border-t border-border pt-3">
-			<VoicePicker bind:engine bind:voice prefix="msg" onchange={persistVoice} />
+		<div class="flex items-start gap-2 border-t border-border pt-3">
+			<div class="min-w-0 flex-1">
+				<VoicePicker bind:engine bind:voice prefix="msg" onchange={persistVoice} />
+			</div>
+			<ReaderSettings />
 		</div>
 
 		<div class="flex flex-wrap items-center gap-2 border-t border-border pt-3">
@@ -372,7 +380,7 @@
 			{/if}
 		</div>
 		{#if pointer}
-			<p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+			<p class="reading-sm mt-2 leading-(--reader-leading) wrap-anywhere text-muted-foreground">
 				<WordLine text={pointer.text} word={pointer.word} />
 			</p>
 		{/if}

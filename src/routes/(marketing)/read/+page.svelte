@@ -127,7 +127,15 @@
 	<h1 class="flex items-center gap-2 font-heading text-2xl italic">
 		<ClipboardPaste class="size-5 text-primary" /> Paste &amp; read
 	</h1>
-	<p class="mt-1 text-sm text-muted-foreground">
+	<!--
+		`text-sm` stays on the two elements below for the line-height ratio it
+		carries; `.reading` supplies the size and the face and deliberately sets no
+		leading, so keeping the utility is what holds their spacing still.
+		The paste box keeps the browser's own wrapping, which is why it alone has no
+		`wrap-anywhere` — an input scrolls rather than splitting a URL mid-word while
+		you edit it.
+	-->
+	<p class="reading mt-1 text-sm text-muted-foreground">
 		Anything you paste is read aloud right here. It stays on this device — no upload, no account
 		needed.
 	</p>
@@ -146,7 +154,7 @@
 			oninput={textEdited}
 			disabled={importUrl.pending > 0}
 			placeholder="Paste an article, a chapter, a PDF page…"
-			class="flex w-full border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50"
+			class="reading flex w-full border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50"
 		></textarea>
 		<p class="text-xs text-muted-foreground">{words} words · nothing leaves your device</p>
 	</div>

@@ -5,6 +5,7 @@
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
+	import ReaderSettings from '$lib/components/reader/reader-settings.svelte';
 
 	/** The landing-page sections. Linked from every marketing route, not just `/`. */
 	const anchors = [
@@ -51,6 +52,15 @@
 			</nav>
 
 			<ThemeToggle />
+
+			<!--
+				Reading text size and face. Shown on the marketing pages that carry
+				reading text and no reader of their own: `/` has none, and `/read`
+				already has the control in the reader's own control row.
+			-->
+			{#if onLogin}
+				<ReaderSettings />
+			{/if}
 
 			{#if signedIn}
 				<div class="hidden items-center gap-1 sm:flex">

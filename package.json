@@ -66,6 +66,7 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
+		"@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
 		"runed": "^0.37.1",
 		"sv-agentation": "^0.4.0",
 		"valibot": "^1.5.0",

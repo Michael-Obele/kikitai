@@ -73,7 +73,8 @@
 			</Card.Content>
 		</Card.Root>
 
-		<p class="mt-4 text-center text-xs text-muted-foreground">
+		<!-- `text-xs` stays for its line-height ratio — see the note in layout.css. -->
+		<p class="reading-sm mt-4 text-center text-xs text-muted-foreground">
 			Sign-in is Google-only. Gmail is requested <strong>read-only</strong> — nothing here can send, delete
 			or modify mail.
 		</p>

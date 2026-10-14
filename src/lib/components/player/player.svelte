@@ -24,6 +24,7 @@
 	import KeyboardHelp from './keyboard-help.svelte';
 	import SpeedMenu from './speed-menu.svelte';
 	import SleepTimer from './sleep-timer.svelte';
+	import ReaderSettings from '$lib/components/reader/reader-settings.svelte';
 
 	type Item = { id: string; text: string; title?: string };
 
@@ -170,7 +171,8 @@
 			{#if spoken}<WordLine
 					text={item.text}
 					word={store.pointer?.word ?? -1}
-				/>{:else}{#each item.runs as run, runIndex (runIndex)}<span class={runClass(run)}>{run.text}</span
+				/>{:else}{#each item.runs as run, runIndex (runIndex)}<span class={runClass(run)}
+						>{run.text}</span
 					>{/each}{/if}
 		</span>{' '}
 	{/each}
@@ -204,7 +206,10 @@
 				Bullets and numbers come from `block.marker` — the syntax that produced
 				them is already gone, which is why the voice never reads it.
 			-->
-			<div bind:this={chunkList} class="mt-2 space-y-2 text-sm leading-relaxed">
+			<div
+				bind:this={chunkList}
+				class="reading mt-2 space-y-2 leading-(--reader-leading) wrap-anywhere"
+			>
 				{#each store.reader.rows as row}
 					{#if row.kind === 'list'}
 						<svelte:element this={row.ordered ? 'ol' : 'ul'} role="list" class="ml-4 space-y-1">
@@ -225,8 +230,18 @@
 					{:else if row.block.kind === 'rule'}
 						<hr class="border-border" />
 					{:else if row.block.kind === 'code'}
+						<!--
+							`0.85em` rather than a fixed `text-xs`: a code block is read at the
+							same size as the prose around it, so it follows the reader's choice
+							instead of sitting at 12px while everything else grows.
+							`wrap-normal` opts this block out of `.reading`'s `wrap-anywhere`:
+							code is precise, so a long line scrolls rather than splitting
+							mid-identifier. It wins where a utility on the reader itself could
+							not — this value is inherited, and a declaration on the element
+							always beats inheritance.
+						-->
 						<pre
-							class="overflow-x-auto rounded-sm bg-muted p-3 font-mono text-xs whitespace-pre-wrap">{@render chunks(
+							class="overflow-x-auto rounded-sm bg-muted p-3 font-mono text-[0.85em] wrap-normal whitespace-pre-wrap">{@render chunks(
 								row.items
 							)}</pre>
 					{:else if row.block.kind === 'quote'}
@@ -236,7 +251,7 @@
 					{:else if row.block.kind === 'heading'}
 						<svelte:element
 							this={`h${row.block.depth ?? 2}`}
-							class="pt-2 font-heading font-semibold text-foreground"
+							class="reading-heading pt-2 font-semibold text-foreground"
 						>
 							{@render chunks(row.items)}
 						</svelte:element>
@@ -354,6 +369,11 @@
 				left={store.sleepLeft}
 				onselect={store.setSleep}
 			/>
+
+			<!-- Only the full reader shows article text, so only it needs the control. -->
+			{#if !compact}
+				<ReaderSettings align="start" />
+			{/if}
 
 			{#if store.status !== 'idle'}
 				<Button variant="ghost" size="icon-sm" aria-label="Stop" onclick={store.stop}>

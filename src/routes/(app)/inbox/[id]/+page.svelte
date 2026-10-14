@@ -40,7 +40,7 @@
 		{:then message}
 			{@const item = override && override.id === message.id ? override : message}
 
-			<h1 class="font-heading text-2xl leading-snug italic">{item.subject}</h1>
+			<h1 class="font-heading text-2xl leading-snug wrap-anywhere italic">{item.subject}</h1>
 			<div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 				<span>{item.fromName || item.fromEmail}</span>
 				{#if item.fromName && item.fromEmail}
