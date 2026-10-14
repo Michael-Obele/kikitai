@@ -39,6 +39,7 @@
 		voice,
 		compact = false,
 		bar = false,
+		stickyControls = false,
 		onPlayed,
 		speed,
 		ramp,
@@ -51,6 +52,14 @@
 		compact?: boolean;
 		/** The global bar itself — it mounts a player but is not page content. */
 		bar?: boolean;
+		/**
+		 * Pin this reader's control row to the bottom of the viewport while the card is
+		 * on screen — for a page whose reader *is* the page's transport (`/read`),
+		 * where a long article pushes Play far below the fold. The row stays in flow,
+		 * so it settles into its own place at the end of the article and nothing is
+		 * ever hidden for good. Ignored when `compact`.
+		 */
+		stickyControls?: boolean;
 		onPlayed?: (id: string) => void;
 		/** Server copy (settings.ttsSpeed) — omitted on the public /read page. */
 		speed?: number;
@@ -156,7 +165,7 @@
 			role="button"
 			tabindex="0"
 			data-chunk={item.index}
-			class="cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {item.index ===
+			class="reading-chunk cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {item.index ===
 				store.sentenceIndex && store.playing
 				? 'bg-primary/15'
 				: 'text-muted-foreground'}"
@@ -263,137 +272,159 @@
 		</div>
 	{/if}
 
-	<div class="flex flex-wrap items-center gap-3 {compact ? '' : 'justify-between'}">
-		<div class="flex flex-wrap items-center gap-3 space-x-3">
-			<Button
-				variant={store.playing ? 'secondary' : 'default'}
-				size={compact ? 'icon-sm' : 'default'}
-				onclick={store.toggle}
-				disabled={store.items.length === 0}
-				aria-label={store.playing ? 'Pause' : 'Play'}
-			>
-				{#if store.status === 'loading'}
-					<LoaderCircle class="size-4 animate-spin" />
-				{:else if store.playing}
-					<Pause class="size-4" />
-				{:else}
-					<Play class="size-4" />
-				{/if}
-				{#if !compact}
-					<span class="ml-1">
-						{store.status === 'loading'
-							? 'Loading voice…'
-							: store.preparing
-								? 'Preparing audio…'
-								: store.playing
-									? 'Pause'
-									: 'Play'}
-					</span>
-				{/if}
-			</Button>
+	<!--
+		One row, three hosts: the global compact bar, a page that pins it, and the
+		plain row in flow. A snippet, so the pinned and in-flow cases cannot drift.
+	-->
+	{#snippet controls()}
+		<div class="flex flex-wrap items-center gap-3 {compact ? '' : 'justify-between'}">
+			<div class="flex flex-wrap items-center gap-3 space-x-3">
+				<Button
+					variant={store.playing ? 'secondary' : 'default'}
+					size={compact ? 'icon-sm' : 'default'}
+					onclick={store.toggle}
+					disabled={store.items.length === 0}
+					aria-label={store.playing ? 'Pause' : 'Play'}
+				>
+					{#if store.status === 'loading'}
+						<LoaderCircle class="size-4 animate-spin" />
+					{:else if store.playing}
+						<Pause class="size-4" />
+					{:else}
+						<Play class="size-4" />
+					{/if}
+					{#if !compact}
+						<span class="ml-1">
+							{store.status === 'loading'
+								? 'Loading voice…'
+								: store.preparing
+									? 'Preparing audio…'
+									: store.playing
+										? 'Pause'
+										: 'Play'}
+						</span>
+					{/if}
+				</Button>
 
-			<!-- Sentence step (fine) and Audible-style time skip (coarse), side by side. -->
-			<div class="flex items-center gap-1">
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Previous sentence"
-					title="Previous sentence (←)"
-					onclick={() => store.skip(-1)}
-					disabled={store.sentenceIndex <= 0}
-				>
-					<ChevronLeft class="size-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Next sentence"
-					title="Next sentence (Right Arrow)"
-					onclick={() => store.skip(1)}
-					disabled={store.sentenceIndex >= store.sentences.length - 1}
-				>
-					<ChevronRight class="size-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Back 15 seconds"
-					title="Back 15 seconds (J)"
-					onclick={() => store.skipSeconds(-15)}
-					disabled={store.sentenceIndex <= 0}
-				>
-					<Rewind class="size-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Forward 30 seconds"
-					title="Forward 30 seconds (L)"
-					onclick={() => store.skipSeconds(30)}
-					disabled={store.sentenceIndex >= store.sentences.length - 1}
-				>
-					<FastForward class="size-4" />
-				</Button>
+				<!-- Sentence step (fine) and Audible-style time skip (coarse), side by side. -->
+				<div class="flex items-center gap-1">
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Previous sentence"
+						title="Previous sentence (←)"
+						onclick={() => store.skip(-1)}
+						disabled={store.sentenceIndex <= 0}
+					>
+						<ChevronLeft class="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Next sentence"
+						title="Next sentence (Right Arrow)"
+						onclick={() => store.skip(1)}
+						disabled={store.sentenceIndex >= store.sentences.length - 1}
+					>
+						<ChevronRight class="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Back 15 seconds"
+						title="Back 15 seconds (J)"
+						onclick={() => store.skipSeconds(-15)}
+						disabled={store.sentenceIndex <= 0}
+					>
+						<Rewind class="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Forward 30 seconds"
+						title="Forward 30 seconds (L)"
+						onclick={() => store.skipSeconds(30)}
+						disabled={store.sentenceIndex >= store.sentences.length - 1}
+					>
+						<FastForward class="size-4" />
+					</Button>
+				</div>
+
+				{#if store.items.length > 1}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Previous"
+						onclick={() => store.jump(store.index - 1)}
+					>
+						<SkipBack class="size-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label="Next"
+						onclick={() => store.jump(store.index + 1)}
+					>
+						<SkipForward class="size-4" />
+					</Button>
+				{/if}
+
+				<SpeedMenu
+					cap={store.cap}
+					ramp={store.rampOn}
+					live={store.liveSpeed}
+					onselect={store.selectSpeed}
+					ontoggle={store.setRamp}
+				/>
+
+				<SleepTimer
+					mode={store.sleepMode}
+					minutes={store.sleepMinutes}
+					left={store.sleepLeft}
+					onselect={store.setSleep}
+				/>
+
+				<!-- Only the full reader shows article text, so only it needs the control. -->
+				{#if !compact}
+					<ReaderSettings align="start" />
+				{/if}
+
+				{#if store.status !== 'idle'}
+					<Button variant="ghost" size="icon-sm" aria-label="Stop" onclick={store.stop}>
+						<Square class="size-4" />
+					</Button>
+				{/if}
+
+				<KeyboardHelp rows={HELP_ROWS} />
 			</div>
 
-			{#if store.items.length > 1}
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Previous"
-					onclick={() => store.jump(store.index - 1)}
-				>
-					<SkipBack class="size-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					aria-label="Next"
-					onclick={() => store.jump(store.index + 1)}
-				>
-					<SkipForward class="size-4" />
-				</Button>
+			{#if compact}
+				<span class="flex items-center gap-3 text-xs text-muted-foreground">
+					<AudioLines class="size-3.5 {store.playing ? 'text-primary' : ''}" />
+					{#if store.sentences.length > 0}
+						<span class="tabular-nums">{@render progress()}</span>
+					{/if}
+					{ENGINES[store.engine].label}
+				</span>
 			{/if}
-
-			<SpeedMenu
-				cap={store.cap}
-				ramp={store.rampOn}
-				live={store.liveSpeed}
-				onselect={store.selectSpeed}
-				ontoggle={store.setRamp}
-			/>
-
-			<SleepTimer
-				mode={store.sleepMode}
-				minutes={store.sleepMinutes}
-				left={store.sleepLeft}
-				onselect={store.setSleep}
-			/>
-
-			<!-- Only the full reader shows article text, so only it needs the control. -->
-			{#if !compact}
-				<ReaderSettings align="start" />
-			{/if}
-
-			{#if store.status !== 'idle'}
-				<Button variant="ghost" size="icon-sm" aria-label="Stop" onclick={store.stop}>
-					<Square class="size-4" />
-				</Button>
-			{/if}
-
-			<KeyboardHelp rows={HELP_ROWS} />
 		</div>
+	{/snippet}
 
-		{#if compact}
-			<span class="flex items-center gap-3 text-xs text-muted-foreground">
-				<AudioLines class="size-3.5 {store.playing ? 'text-primary' : ''}" />
-				{#if store.sentences.length > 0}
-					<span class="tabular-nums">{@render progress()}</span>
-				{/if}
-				{ENGINES[store.engine].label}
-			</span>
-		{/if}
-	</div>
+	{#if stickyControls && !compact}
+		<!--
+			Sticky and still in flow, the way `(app)/+layout.svelte` pins its own
+			transport: it floats over the tail of a long article and then settles into
+			its own row at the end, so nothing needs a fixed offset. It takes the
+			card's surface, because while stuck the text passes underneath it. The
+			chunk's `.reading-chunk` scroll margin keeps the spoken sentence well above
+			this bar: it is a reading comfort band, and the bar sits inside it.
+		-->
+		<div class="sticky bottom-0 z-10 border-t border-border bg-card py-2">
+			{@render controls()}
+		</div>
+	{:else}
+		{@render controls()}
+	{/if}
 
 	<!-- Open ⇔ the store has a pending (not yet acknowledged) engine download. -->
 	<Dialog.Root

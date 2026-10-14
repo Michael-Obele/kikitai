@@ -211,19 +211,22 @@
 
 	<div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
 		<div class="min-w-0">
-			<div class="border border-border p-3">
-				<Player
-					store={readPlayer}
-					{items}
-					{engine}
-					{voice}
-					speed={resolved.speed}
-					ramp={resolved.ramp}
-				/>
-			</div>
+			<!--
+				No wrapper box: the reader draws its own frame, and the transport has to
+				run the full width of the column to pin itself to the viewport cleanly.
+			-->
+			<Player
+				store={readPlayer}
+				{items}
+				{engine}
+				{voice}
+				speed={resolved.speed}
+				ramp={resolved.ramp}
+				stickyControls
+			/>
 		</div>
 
-		<aside class="space-y-4 lg:sticky lg:top-6">
+		<aside class="space-y-4 lg:sticky lg:top-20">
 			<div class="border border-border p-3">
 				<VoicePicker bind:engine bind:voice prefix="read" onchange={voiceChanged} />
 			</div>
