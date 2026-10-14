@@ -6,6 +6,7 @@
 	import FactsChips from '$lib/components/inbox/facts-chips.svelte';
 	import { getDigest, getSettings, markDigested } from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
+	import { resolveVoicePrefs } from '$lib/player-prefs.svelte';
 
 	const digest = getDigest();
 	const settings = getSettings();
@@ -60,6 +61,7 @@
 			</div>
 		{:else}
 			{#if cfg}
+				{@const prefs = resolveVoicePrefs(cfg)}
 				<Card.Root class="mt-6">
 					<Card.Header class="flex-row items-center justify-between space-y-0">
 						<div class="flex items-center gap-2">
@@ -74,10 +76,10 @@
 					</Card.Header>
 					<Card.Content>
 						<Player
-							engine={cfg.ttsEngine}
-							voice={cfg.ttsVoice}
-							speed={cfg.ttsSpeed}
-							ramp={cfg.ttsRamp}
+							engine={prefs.engine}
+							voice={prefs.voice}
+							speed={prefs.speed}
+							ramp={prefs.ramp}
 							{onPlayed}
 							items={items.map((item) => ({
 								id: item.id,

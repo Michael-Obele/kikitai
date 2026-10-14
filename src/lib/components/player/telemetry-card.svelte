@@ -95,7 +95,7 @@
 		</Button>
 	</div>
 	{#if telemetry.current.length === 0 && vitals.inp === null}
-		<p class="mt-1.5 text-muted-foreground/70">No measurements yet — press Play.</p>
+		<p class="mt-1.5 text-muted-foreground">No measurements yet — press Play.</p>
 	{:else}
 		<!--
 			The headline is one line and always open: RTF (does generation keep up),

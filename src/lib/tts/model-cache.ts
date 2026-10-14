@@ -13,6 +13,8 @@
  * The base URL is a parameter: the worker bundle cannot read `$env`, so the
  * caller passes `PUBLIC_TTS_MODEL_BASE` in.
  */
+import type { EngineId } from './index';
+
 const CACHE_NAME = 'kitten-tts';
 const REPO = 'KittenML/kitten-tts-nano-0.8';
 const key = (file: string) => `/${REPO.replace('/', '__')}__${file.replace(/\//g, '_')}`;
@@ -97,5 +99,66 @@ export async function seedKittenModel(modelBase?: string): Promise<SeedResult> {
 	} catch (error) {
 		console.warn('[tts] mirror seed failed — falling back to HuggingFace', error);
 		return { ok: false, fetchMs: performance.now() - started };
+	}
+}
+
+/**
+ * Offline answer: is everything this engine needs already in the browser?
+ *
+ * (The plan called for `has(engine)` — this is it, sitting next to the caches
+ * it inspects.) Local engines are only "had" when their weights are in the
+ * Cache API: kitten in the `kitten-tts` slot — filled both by our mirror seed
+ * above and by the package's own loader — and kokoro in the `transformers-cache`
+ * slot that kokoro-js (a transformers.js core) opens. Web Speech needs no
+ * download at all; the cloud engines are never true here, because their audio
+ * is synthesized on a server that needs the network to reach.
+ */
+export async function hasModel(engine: EngineId): Promise<boolean> {
+	switch (engine) {
+		case 'webspeech':
+			return true;
+		case 'google':
+		case 'minimax':
+			return false;
+		case 'kitten':
+			return kittenCached();
+		case 'kokoro':
+			return kokoroCached();
+	}
+}
+
+/** Kitten: config + the ONNX weights + the voices file, all three in one slot. */
+async function kittenCached(): Promise<boolean> {
+	if (typeof caches === 'undefined') return false;
+	try {
+		const cache = await caches.open(CACHE_NAME);
+		const config = await cache.match(key('config.json'));
+		if (!config) return false;
+		const parsed = (await config.json()) as { model_file?: string; voices?: string };
+		if (!parsed.model_file) return false;
+		const model = await cache.match(key(parsed.model_file));
+		const voices = await cache.match(key(parsed.voices ?? 'voices.npz'));
+		return Boolean(model && voices);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Kokoro: kokoro-js keys weights by the full request URL inside the
+ * transformers.js cache — match any Kokoro `.onnx` it would otherwise fetch.
+ * Its per-voice `.bin` files live in a second slot (`kokoro-voices`) fetched
+ * per voice on first use, so a voice never played before a drop still fails
+ * with the player's usual toast: this probe is engine-level, as the plan asks.
+ */
+async function kokoroCached(): Promise<boolean> {
+	if (typeof caches === 'undefined') return false;
+	try {
+		const cache = await caches.open('transformers-cache');
+		return (await cache.keys()).some(
+			(request) => request.url.includes('Kokoro-82M') && request.url.includes('.onnx')
+		);
+	} catch {
+		return false;
 	}
 }

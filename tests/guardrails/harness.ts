@@ -9,7 +9,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
  * storage (Cache Storage + IndexedDB), so a warm profile is the difference
  * between a 3-second probe and a 57MB download on every run.
  */
-const PROFILE_DIR = path.join(ROOT, 'tests', '.profile');
+export const PROFILE_DIR = path.join(ROOT, 'tests', '.profile');
 
 export const BASE_URL =
 	process.env.GUARDRAIL_BASE_URL ?? `http://localhost:${process.env.GUARDRAIL_PORT ?? '5173'}`;
@@ -37,16 +37,29 @@ export async function openContext(): Promise<BrowserContext> {
 	await context.addCookies([{ name: DEV_USER_COOKIE, value: FAKE_USER, url: BASE_URL }]);
 
 	// The "downloads 57MB once" notice would otherwise gate every probe behind a
-	// click that has nothing to do with what is being measured.
+	// click that has nothing to do with what is being measured — and a remembered
+	// resume position would start a probe at sentence 16 of 17 (play one chunk,
+	// hit the end of the item, look exactly like a stall: seen 2026-09-29).
+	// The one probe that is *about* resume sets `kikitai.keep-resume` in
+	// sessionStorage first (per tab, so no other probe is affected) and keeps it.
 	await context.addInitScript(() => {
 		localStorage.setItem('kikitai-tts-ack:kitten', '1');
 		localStorage.setItem('kikitai-tts-ack:kokoro', '1');
+		if (!sessionStorage.getItem('kikitai.keep-resume')) {
+			localStorage.removeItem('kikitai.player.resume');
+		}
 	});
 
 	return context;
 }
 
 export async function closeContext(): Promise<void> {
+	// Per-file `afterAll(closeContext)` calls are a no-op during a run: relaunching
+	// a browser for every spec file races the previous one's shutdown, and those
+	// orphans were found dying mid-run (`Target page, context or browser has been
+	// closed`) with the suite's later tests never starting. One browser serves the
+	// whole suite; `global-teardown.ts` sets GUARDRAILS_TEARDOWN and closes it.
+	if (process.env.GUARDRAILS_TEARDOWN !== '1') return;
 	const context = holder.guardrailContext;
 	holder.guardrailContext = undefined;
 	await context?.close();

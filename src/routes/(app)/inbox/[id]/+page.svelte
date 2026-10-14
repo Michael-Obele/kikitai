@@ -7,7 +7,7 @@
 	import { getMessage, getSettings } from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
 	import { CATEGORY_LABELS, type MessageDto } from '$lib/types/mail';
-	import type { EngineId } from '$lib/tts';
+	import { resolveVoicePrefs } from '$lib/player-prefs.svelte';
 
 	let { params }: PageProps = $props();
 
@@ -61,19 +61,27 @@
 
 			<div class="mt-6">
 				{#if cfg}
+					<!-- The one resolution rule (player-prefs) — the four raw settings reads end here. -->
+					{@const prefs = resolveVoicePrefs(cfg)}
 					<MessagePanel
 						{item}
-						engine={cfg.ttsEngine as EngineId}
-						voice={cfg.ttsVoice}
-						speed={cfg.ttsSpeed}
-						ramp={cfg.ttsRamp}
+						engine={prefs.engine}
+						voice={prefs.voice}
+						speed={prefs.speed}
+						ramp={prefs.ramp}
 						onsaved={(fresh) => (override = fresh)}
 					/>
 				{/if}
 			</div>
 
 			<div class="mt-6 flex justify-end border-t border-border pt-4">
+				<!--
+					The anchor is the tap target, so it has to be the button's box —
+					as an inline wrapper its own box collapses (Lighthouse measured it
+					at 136×1px, below the 24×24 minimum).
+				-->
 				<a
+					class="inline-flex"
 					href="https://mail.google.com/mail/u/0/#all/{item.gmailId}"
 					target="_blank"
 					rel="noreferrer"

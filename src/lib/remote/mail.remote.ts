@@ -3,6 +3,7 @@ import { command, query, requested } from '$app/server';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm';
 import * as v from 'valibot';
 import { requireUser } from '$lib/server/session';
+import { requireAiUser } from '$lib/server/guard';
 import { db } from '$lib/server/db';
 import { account, mailAccount, message, threadSummary } from '$lib/server/db/schema';
 import * as gmailApi from '$lib/server/gmail';
@@ -359,9 +360,7 @@ async function threadEntries(
 
 /** One summary for the whole conversation — generated once, then cached per thread. */
 export const loadThreadSummary = command(v.string(), async (id: string) => {
-	const { user } = await requireUser();
-	const aiConfig = await getAiConfig(user.id);
-	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	const { user, aiConfig } = await requireAiUser();
 
 	const target = await db
 		.select()

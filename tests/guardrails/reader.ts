@@ -42,7 +42,9 @@ export async function openReader(page: Page): Promise<void> {
 	// without it the generation budget this suite guards is unreachable.
 	expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 	await page.evaluate(() => {
-		localStorage.removeItem('kikitai.player.resume');
+		if (!sessionStorage.getItem('kikitai.keep-resume')) {
+			localStorage.removeItem('kikitai.player.resume');
+		}
 		localStorage.removeItem('kikitai.read.telemetry');
 	});
 }

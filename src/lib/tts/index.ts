@@ -2,7 +2,7 @@ import { synthesize } from '$lib/remote';
 import { recordTts, sessionId } from './telemetry';
 import { chunkKey, loadAudio, saveAudio } from './audio-cache';
 import { localGen } from './local-gen';
-import { speakable } from './pronunciation';
+import { speakable, ssmlSpeakable } from './pronunciation';
 
 export type EngineId = 'kitten' | 'kokoro' | 'webspeech' | 'google' | 'minimax';
 
@@ -14,6 +14,8 @@ export type EngineMeta = {
 	downloadMb: number;
 	/** True when the text never leaves the device. */
 	local: boolean;
+	/** True when the engine parses its input as SSML and can speak a `<phoneme>` tag. */
+	ssml: boolean;
 	voices: string[];
 	defaultVoice: string;
 };
@@ -30,6 +32,7 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 		note: 'Tiny local model, Apache-2.0. ~57MB once, then offline forever.',
 		downloadMb: 57,
 		local: true,
+		ssml: false,
 		voices: ['Luna', 'Bella', 'Rosie', 'Kiki', 'Leo', 'Jasper', 'Bruno', 'Hugo'],
 		defaultVoice: 'Luna'
 	},
@@ -39,6 +42,7 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 		note: 'Higher quality local model. ~90MB on WASM, ~310MB with WebGPU (fp32).',
 		downloadMb: 90,
 		local: true,
+		ssml: false,
 		voices: ['af_heart', 'af_bella', 'af_nicole', 'am_adam', 'am_michael', 'bf_emma', 'bf_george'],
 		defaultVoice: 'af_heart'
 	},
@@ -48,6 +52,7 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 		note: 'Your OS voices. Instant, 0MB, works everywhere (quality varies).',
 		downloadMb: 0,
 		local: true,
+		ssml: false,
 		voices: [],
 		defaultVoice: ''
 	},
@@ -57,6 +62,8 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 		note: 'Server-side voice. Text is sent to Google — needs GOOGLE_TTS_KEY.',
 		downloadMb: 0,
 		local: false,
+		// input.text is parsed as SSML when it carries tags — the phoneme path.
+		ssml: true,
 		voices: ['en-US-Neural2-C', 'en-US-Neural2-D', 'en-GB-Neural2-A'],
 		defaultVoice: 'en-US-Neural2-C'
 	},
@@ -66,6 +73,9 @@ export const ENGINES: Record<EngineId, EngineMeta> = {
 		note: 'Server-side voice, the expensive option. Needs MINIMAX_* keys.',
 		downloadMb: 0,
 		local: false,
+		// t2a_v2 takes plain `text` in its body — there is no SSML field in the
+		// call we make, so a <phoneme> tag would be read out (or rejected).
+		ssml: false,
 		voices: ['male-qn-qingse', 'female-shaonv'],
 		defaultVoice: 'female-shaonv'
 	}
@@ -154,7 +164,7 @@ export function resumePlayback() {
 	else void ctx?.resume();
 }
 
-function playBuffer(buffer: AudioBuffer): Promise<void> {
+function playBuffer(buffer: AudioBuffer, offsetSeconds = 0): Promise<void> {
 	return new Promise((done) => {
 		const context = audioContext();
 		// The opener can be prepared before any user gesture (warm-up), when the
@@ -169,12 +179,20 @@ function playBuffer(buffer: AudioBuffer): Promise<void> {
 			done();
 		};
 		source = node;
-		node.start();
+		// A seek at or past the end would never fire `onended` — clamp inside the
+		// buffer so a resumed chunk can always finish.
+		const offset = Math.min(Math.max(0, offsetSeconds), Math.max(0, buffer.duration - 0.01));
+		node.start(0, offset);
 		resolveEnd = () => done();
 	});
 }
 
-function playBase64(audio: string, mime: string, speed = DEFAULT_SPEED): Promise<void> {
+function playBase64(
+	audio: string,
+	mime: string,
+	speed = DEFAULT_SPEED,
+	offsetValue = 0
+): Promise<void> {
 	return new Promise((done, fail) => {
 		const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
 		const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
@@ -182,6 +200,26 @@ function playBase64(audio: string, mime: string, speed = DEFAULT_SPEED): Promise
 		if (speed !== 1) {
 			el.playbackRate = speed;
 			if ('preservesPitch' in el) el.preservesPitch = true;
+		}
+		if (offsetValue > 0) {
+			// Setting `currentTime` before the metadata arrives throws, so the seek
+			// waits for the duration — this is the resume path for cloud engines.
+			// The clamp matters: for cloud engines the offset comes from an *estimate*
+			// of the chunk length, so real audio can be shorter than the point we are
+			// asked to seek to. Seeking to or past `duration` does not reliably fire
+			// `ended`, which would leave the run awaiting `playPrepared` forever with
+			// `status` stuck at 'playing'. `playBuffer` clamps for the same reason.
+			el.addEventListener(
+				'loadedmetadata',
+				() => {
+					try {
+						el.currentTime = Math.min(offsetValue, Math.max(0, (el.duration || 0) - 0.05));
+					} catch {
+						/* not seekable (live/odd container) — play from the top */
+					}
+				},
+				{ once: true }
+			);
 		}
 		audioEl = el;
 		el.onended = () => {
@@ -198,7 +236,19 @@ function playBase64(audio: string, mime: string, speed = DEFAULT_SPEED): Promise
 	});
 }
 
-function speakWithWebSpeech(text: string, voice: string, rate = DEFAULT_SPEED): Promise<void> {
+/**
+ * Web Speech has no offset — an utterance always starts at the beginning.
+ * `offsetValue` is accepted and ignored so every engine shares one `play`
+ * signature: a resumed chunk still plays, and the caller shifts the word
+ * pointer instead (the plan's fallback: position kept, no audio gap).
+ */
+function speakWithWebSpeech(
+	text: string,
+	voice: string,
+	rate = DEFAULT_SPEED,
+	offsetValue = 0
+): Promise<void> {
+	void offsetValue;
 	return new Promise((done) => {
 		const utterance = new SpeechSynthesisUtterance(text);
 		const voices = speechSynthesis.getVoices();
@@ -221,8 +271,9 @@ export type PreparedSpeech = {
 	cached?: boolean;
 	/** How long this chunk runs — progress (and word highlighting) divides by it. */
 	audioMs: number;
-	/** Plays the generated audio; resolves when the chunk has finished. */
-	play: () => Promise<void>;
+	/** Plays the generated audio; resolves when the chunk has finished.
+	 *  The argument is an offset in **seconds** — start part-way in (resume). */
+	play: (offsetSeconds?: number) => Promise<void>;
 };
 
 /**
@@ -248,19 +299,22 @@ export async function prepare(
 ): Promise<PreparedSpeech> {
 	stopped = false;
 	// The reader's say-as rules rewrite the spoken copy only — what is on
-	// screen (and the chunk boundaries around it) never changes.
-	const clean = speakable(text.trim());
+	// screen (and the chunk boundaries around it) never changes. `clean` is
+	// also what local engines generate and hash into the cache key, so a key
+	// always matches the bytes it plays.
+	const source = text.trim();
+	const clean = speakable(source);
 	if (!clean) return { genMs: 0, chars: 0, audioMs: 0, play: async () => {} };
 
 	const started = performance.now();
-	let play: () => Promise<void>;
+	let play: (offsetSeconds?: number) => Promise<void>;
 	let cached = false;
 	let audioMs = estimateMs(clean, speed);
 
 	if (engine === 'webspeech') {
 		if (typeof speechSynthesis === 'undefined')
 			throw new Error('Web Speech is not available here.');
-		play = () => speakWithWebSpeech(clean, voice, speed);
+		play = (offset) => speakWithWebSpeech(clean, voice, speed, offset);
 	} else if (engine === 'kitten' || engine === 'kokoro') {
 		const voiceName = voice || ENGINES[engine].defaultVoice;
 		const context = audioContext();
@@ -269,9 +323,9 @@ export async function prepare(
 		if (cachedBuffer) {
 			// A re-listen: decode beats another inference pass, every time.
 			cached = true;
-			play = async () => {
+			play = async (offset = 0) => {
 				if (stopped) return;
-				await playBuffer(cachedBuffer);
+				await playBuffer(cachedBuffer, offset);
 			};
 		} else {
 			// Inference happens in the worker — the main thread only moves PCM.
@@ -282,16 +336,21 @@ export async function prepare(
 			// Local engines know exactly how long the audio is.
 			audioMs = Math.round(buffer.duration * 1000);
 			void saveAudio(key, buffer.getChannelData(0), buffer.sampleRate);
-			play = async () => {
+			play = async (offset = 0) => {
 				if (stopped) return;
-				await playBuffer(buffer);
+				await playBuffer(buffer, offset);
 			};
 		}
 	} else {
-		const result = await synthesize({ text: clean, engine, voice });
-		play = async () => {
+		// What leaves the device: SSML engines get the phoneme-wrapped form,
+		// everyone else the plain substitution. The server builds its synthesis
+		// cache key from this exact string, so an edited IPA can never replay
+		// old audio and the two forms cannot collide there.
+		const sent = ENGINES[engine].ssml ? ssmlSpeakable(source) : clean;
+		const result = await synthesize({ text: sent, engine, voice });
+		play = async (offset = 0) => {
 			if (stopped) return;
-			await playBase64(result.audio, result.mime, speed);
+			await playBase64(result.audio, result.mime, speed, offset);
 		};
 	}
 
@@ -308,11 +367,22 @@ export async function prepare(
 	return { genMs, chars: clean.length, cached, audioMs, play };
 }
 
-/** Play a `prepare`d chunk, recording how long the audio actually took. */
-export async function playPrepared(engine: EngineId, prepared: PreparedSpeech): Promise<void> {
+/**
+ * Play a `prepare`d chunk, recording how long the audio actually took.
+ *
+ * `seekMs` starts the chunk part-way in — the word-level resume. The recorded
+ * `ms` is the wall time *this session* played, so two half-listened sessions
+ * add up to the chunk instead of counting it twice; and a reload re-prepares
+ * from the audio cache, which is recorded as `cached: true` and costs ~50ms.
+ */
+export async function playPrepared(
+	engine: EngineId,
+	prepared: PreparedSpeech,
+	seekMs = 0
+): Promise<void> {
 	const started = performance.now();
 	try {
-		await prepared.play();
+		await prepared.play(Math.max(0, seekMs) / 1000);
 	} finally {
 		const audioMs = performance.now() - started;
 		recordTts({

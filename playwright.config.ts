@@ -20,7 +20,13 @@ export default defineConfig({
 	/** One worker: the probes share one browser profile (and its model cache). */
 	workers: 1,
 	forbidOnly: !!process.env.CI,
-	retries: 0,
+	/**
+	 * One retry: this box is shared, and the dev server, the remote database and
+	 * the browser have all been killed mid-run by things outside this suite
+	 * (a network blip to Neon failed a test at 0ms; another tool's cleanup
+	 * pkill-ed Chromium once). A real regression still fails both attempts.
+	 */
+	retries: 1,
 	/** First run downloads the 57MB voice model; playback probes then run ~30s. */
 	timeout: 300_000,
 	expect: { timeout: 20_000 },

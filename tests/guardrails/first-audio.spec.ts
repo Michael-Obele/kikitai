@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { resetProbeSettings } from './db';
-import { closeContext, newPage, watchIsolation } from './harness';
-import { openReader, paste, playButton, statsOf, waitForStats } from './reader';
+import { closeContext, newPage, watchConsole, watchIsolation } from './harness';
+import { openReader, paste, playButton, statsOf, statsSince, waitForStats } from './reader';
 
 test.beforeAll(async () => {
 	await resetProbeSettings();
@@ -19,20 +19,38 @@ test('first audio arrives within 1s of Play', async () => {
 	const since = Date.now();
 	const page = await newPage();
 	const failures = watchIsolation(page);
+	// The [tts] sequence shows whether the warm bank was actually consumed:
+	// a `gen` logged *after* the press means chunk 0 was regenerated at Play time.
+	const logs = watchConsole(page);
+	/** Press time, hoisted so the finally block can build a timeline from it. */
+	let pressedAt = 0;
 
-	await openReader(page);
-	await paste(page);
-	// The warm bank generates the first three chunks once the text sits still.
-	await waitForStats(page, since, 'gen', 3);
+	try {
+		await openReader(page);
+		await paste(page);
+		// The warm bank generates the first three chunks once the text sits still.
+		await waitForStats(page, since, 'gen', 3);
 
-	await playButton(page).click();
-	await waitForStats(page, since, 'first', 1, 60_000);
+		await playButton(page).click();
+		pressedAt = Date.now();
+		await waitForStats(page, since, 'first', 1, 60_000);
 
-	const [first] = await statsOf(page, since, 'first');
-	expect(first).toBeDefined();
-	console.log(`[guardrail] first audio ${Math.round(first!.ms)}ms after Play`);
-	expect(first!.ms).toBeLessThan(1000);
-	expect(failures).toEqual([]);
+		const [first] = await statsOf(page, since, 'first');
+		expect(first).toBeDefined();
+		console.log(`[guardrail] first audio ${Math.round(first!.ms)}ms after Play`);
+		expect(first!.ms).toBeLessThan(1000);
+		expect(failures).toEqual([]);
+	} finally {
+		console.log(logs.filter((line) => line.includes('[tts]')).join('\n'));
+		// Press-relative timeline: shows exactly where the seconds go.
+		const stats = await statsSince(page, since);
+		console.log(
+			`[guardrail] timeline: ${stats
+				.sort((a, b) => a.at - b.at)
+				.map((stat) => `${stat.kind}+${stat.at - pressedAt}ms`)
+				.join(' ')}`
+		);
+	}
 
 	await page.close();
 });

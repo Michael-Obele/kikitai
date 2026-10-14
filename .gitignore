@@ -34,3 +34,9 @@ docs/plans/*
 tests/.profile/
 test-results/
 playwright-report/
+
+# Lighthouse CI output
+.lighthouseci/
+lighthouse-report/
+tests/.guardrail-cookie
+.superpowers/*

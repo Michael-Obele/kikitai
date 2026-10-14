@@ -199,7 +199,8 @@
 
 	<section class="border-t border-border pt-3">
 		<div class="flex items-center justify-between gap-2">
-			<h4 class="text-xs tracking-widest text-muted-foreground uppercase">Details</h4>
+			<!-- Sections are h2 under the page's h1 — an h4 here breaks heading order. -->
+			<h2 class="text-xs tracking-widest text-muted-foreground uppercase">Details</h2>
 			<Button variant="ghost" size="sm" onclick={showDetails} disabled={loadingDetails}>
 				{#if loadingDetails}
 					<LoaderCircle class="size-4 animate-spin" /> Thinking…
@@ -226,7 +227,7 @@
 				</p>
 			{/if}
 		{:else}
-			<p class="mt-1 text-xs text-muted-foreground/70">
+			<p class="mt-1 text-xs text-muted-foreground">
 				One AI call the first time — bullets, what it's asking of you, and every deadline.
 			</p>
 		{/if}
@@ -246,7 +247,7 @@
 					<p class="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
 						<WandSparkles class="size-3 shrink-0 text-primary" />
 						<span class="tracking-widest uppercase">AI rewrite</span>
-						<span class="truncate text-muted-foreground/60">
+						<span class="truncate text-muted-foreground">
 							— links, markdown and mailing-list furniture removed
 						</span>
 					</p>
@@ -261,7 +262,15 @@
 					</Button>
 				</div>
 			{/if}
+			<!--
+				A scrollable region must be reachable by keyboard (WCAG 2.1.1, axe
+				`scrollable-region-focusable`): without a tab stop the reader can see
+				the overflow but never scroll it without a mouse. Svelte's heuristic
+				sees a plain div; the scroll container is the reason it has focus.
+			-->
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<div
+				tabindex="0"
 				class="max-h-64 overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground"
 			>
 				{body}
@@ -289,9 +298,9 @@
 
 		{#if (full.threadCount ?? 0) > 1}
 			<section class="border-t border-border pt-3">
-				<h4 class="text-xs tracking-widest text-muted-foreground uppercase">
+				<h2 class="text-xs tracking-widest text-muted-foreground uppercase">
 					Conversation · {thread?.messageCount ?? full.threadCount} messages
-				</h4>
+				</h2>
 				{#if thread}
 					<p class="mt-2 text-sm">{thread.summary}</p>
 					{#if thread.highlights.length > 0}
@@ -304,7 +313,7 @@
 						</ul>
 					{/if}
 				{:else}
-					<p class="mt-1 text-xs text-muted-foreground/70">
+					<p class="mt-1 text-xs text-muted-foreground">
 						One summary for the whole conversation, not just this message.
 					</p>
 					<Button

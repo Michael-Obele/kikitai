@@ -89,14 +89,21 @@
 	// the saveSettings form — same deal as Playback above.
 	let pronFrom = $state('');
 	let pronTo = $state('');
+	let pronIpa = $state('');
+
+	/** Rough check only — these four characters would end the SSML tag early. */
+	const pronIpaBad = $derived(/[<">&]/.test(pronIpa.trim()));
 
 	function addRule() {
 		const from = pronFrom.trim();
 		const to = pronTo.trim();
-		if (!from || !to) return;
-		pronunciation.rules = [...pronunciation.rules, { from, to }];
+		const ipa = pronIpa.trim();
+		if (!from || !to || pronIpaBad) return;
+		// `ipa` is only written when present, so stored rules keep the old shape.
+		pronunciation.rules = [...pronunciation.rules, { from, to, ...(ipa ? { ipa } : {}) }];
 		pronFrom = '';
 		pronTo = '';
+		pronIpa = '';
 	}
 
 	function removeRule(index: number) {
@@ -368,6 +375,9 @@
 								<p class="inline-flex min-w-0 items-center gap-1 truncate text-sm">
 									<span class="font-medium">{rule.from}</span>
 									<ArrowRight class="size-3 shrink-0 text-muted-foreground" />{rule.to}
+									{#if rule.ipa}
+										<span class="text-muted-foreground">/{rule.ipa}/</span>
+									{/if}
 								</p>
 								<Button
 									variant="ghost"
@@ -401,10 +411,28 @@
 						<Label for="pronTo">Say as</Label>
 						<Input id="pronTo" placeholder="kee-kai-tai" bind:value={pronTo} />
 					</div>
-					<Button type="submit" variant="outline" disabled={!pronFrom.trim() || !pronTo.trim()}>
+					<div class="min-w-44 flex-1 space-y-1.5">
+						<Label for="pronIpa">IPA (optional)</Label>
+						<Input id="pronIpa" placeholder="kiː.kaɪ.taɪ" bind:value={pronIpa} />
+						{#if pronIpaBad}
+							<p class="text-xs text-destructive">
+								No ", &lt;, &gt; or &amp; — they would break the phoneme tag.
+							</p>
+						{/if}
+					</div>
+					<Button
+						type="submit"
+						variant="outline"
+						disabled={!pronFrom.trim() || !pronTo.trim() || pronIpaBad}
+					>
 						<Plus class="size-4" /> Add
 					</Button>
 				</form>
+				<p class="text-xs text-muted-foreground">
+					The IPA field is only used by engines that accept phonemes (Google Cloud TTS). Local
+					engines — Kitten, Kokoro, Web Speech — take plain text, so they always say the "Say as"
+					value.
+				</p>
 			</Card.Content>
 		</Card.Root>
 	</div>

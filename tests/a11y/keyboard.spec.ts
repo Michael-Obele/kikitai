@@ -43,8 +43,15 @@ test('the player is reachable, operable and visible to the keyboard alone', asyn
 	const labels = new Set<string>();
 	let chunkFocus: Focus | null = null;
 	let playFocus: Focus | null = null;
+	let steps = 0;
 
-	for (let step = 0; step < 80; step++) {
+	// Start from the top of the document: `fill()` leaves focus in the textarea,
+	// and where the walk *begins* decides how many presses each control needs.
+	await page.evaluate(() => {
+		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+	});
+
+	for (; steps < 150; steps++) {
 		if (REQUIRED_CONTROLS.every((label) => labels.has(label)) && chunkFocus && playFocus) break;
 		await page.keyboard.press('Tab');
 		const focus = await focused(page);
@@ -53,9 +60,21 @@ test('the player is reachable, operable and visible to the keyboard alone', asyn
 		if (focus.isChunk && !chunkFocus) chunkFocus = focus;
 		if (focus.label === 'Play') playFocus = focus;
 	}
+	// Printed even on success: a Tab walk that quietly stops early is otherwise
+	// indistinguishable from a control that is genuinely unreachable.
+	console.log(
+		`[a11y] Tab walk: ${steps} presses → ${labels.size} labelled controls [${[...labels].join(', ')}]`
+	);
 
 	for (const label of REQUIRED_CONTROLS) {
-		expect(labels, `no Tab path to "${label}"`).toContain(label);
+		if (labels.has(label)) continue;
+		// Disabled controls have no tab stop by design (previous-sentence and
+		// back-15s are off at the start of an item) — that is allowed, *reachable
+		// but inert* is not.
+		await expect(
+			page.locator(`button[aria-label="${label}"]`),
+			`"${label}" is neither tabbable nor disabled`
+		).toBeDisabled();
 	}
 	expect(chunkFocus, 'the sentence chunks must be tabbable (tabindex="0")').not.toBeNull();
 	expect(chunkFocus!.hasFocusRing, 'focused chunk must show a focus ring').toBe(true);
@@ -72,9 +91,10 @@ test('the player is reachable, operable and visible to the keyboard alone', asyn
 	}
 	expect(onChunk, 'no Tab path to a sentence chunk').toBe(true);
 	await page.keyboard.press('Enter');
-	await expect(playButton(page)).toHaveAttribute('aria-label', 'Pause', { timeout: 30_000 });
+	// The toggle renames itself once it is playing, so address it by state.
+	await expect(page.locator('button[aria-label="Pause"]')).toBeVisible({ timeout: 30_000 });
 	await page.keyboard.press('k');
-	await expect(playButton(page)).toHaveAttribute('aria-label', 'Play', { timeout: 10_000 });
+	await expect(page.locator('button[aria-label="Play"]')).toBeVisible({ timeout: 10_000 });
 
 	// --- 3. `?` opens the shortcut help, Esc closes it ----------------------
 	await page.keyboard.press('?');

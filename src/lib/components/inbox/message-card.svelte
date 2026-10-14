@@ -78,7 +78,7 @@
 			{:else if item.organizeError}
 				<p class="mt-1.5 text-xs text-destructive">{item.organizeError}</p>
 			{:else}
-				<p class="mt-1.5 text-xs text-muted-foreground/70 italic">not organized yet</p>
+				<p class="mt-1.5 text-xs text-muted-foreground italic">not organized yet</p>
 			{/if}
 			<FactsChips facts={item.facts} />
 		</div>

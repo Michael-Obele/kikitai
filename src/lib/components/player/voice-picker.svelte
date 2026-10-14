@@ -3,6 +3,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
 	import { ENGINES, type EngineId } from '$lib/tts';
+	import { engineAvailable } from '$lib/player-prefs.svelte';
 
 	let {
 		engine = $bindable<EngineId>('kitten'),
@@ -19,8 +20,17 @@
 	} = $props();
 
 	const meta = $derived(ENGINES[engine]);
+	/**
+	 * Offline: only engines that can still speak — plus the one already picked,
+	 * which always stays in the list so a choice is never silently replaced; its
+	 * `note` below explains why it cannot play. The alternative (a disabled
+	 * option) would hide it from the click path and put its label at a contrast
+	 * we have never measured, so the note carries the news instead.
+	 */
 	const engineItems = $derived(
-		Object.values(ENGINES).map((option) => ({ value: option.id, label: option.label }))
+		Object.values(ENGINES)
+			.filter((option) => engineAvailable(option.id) || option.id === engine)
+			.map((option) => ({ value: option.id, label: option.label }))
 	);
 	const voiceItems = $derived(meta.voices.map((name) => ({ value: name, label: name })));
 
@@ -37,6 +47,15 @@
 		voice = next;
 		onchange?.();
 	}
+
+	/** The engine's own note, plus why it cannot play right now (offline only). */
+	const note = $derived.by(() => {
+		if (engineAvailable(engine)) return meta.note;
+		// Local and cloud fail differently: only one of them gets fixed by waiting.
+		return ENGINES[engine].local
+			? `${meta.note} Offline: this model is not saved in this browser, so it cannot play yet.`
+			: `${meta.note} Offline: this engine sends text to a server, so it needs a connection.`;
+	});
 </script>
 
 <!--
@@ -86,6 +105,6 @@
 		</div>
 	{/if}
 	<p id="{prefix}-note" class="max-w-56 text-[11px] leading-tight text-muted-foreground">
-		{meta.note}
+		{note}
 	</p>
 </div>

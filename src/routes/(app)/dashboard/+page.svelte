@@ -28,7 +28,7 @@
 	} from '$lib/remote';
 	import { errorMessage } from '$lib/errors';
 	import { CATEGORIES, CATEGORY_LABELS, type InboxFilter, type InboxItem } from '$lib/types/mail';
-	import type { EngineId } from '$lib/tts';
+	import { resolveVoicePrefs } from '$lib/player-prefs.svelte';
 
 	let search = $state('');
 	let category = $state<string>('all');
@@ -281,13 +281,15 @@
 
 				<!-- Rendered outside the inbox {#await}, with settings read via .current, so a refresh never unmounts it. -->
 				{#if cfg}
+					<!-- The one resolution rule (player-prefs) — the four raw settings reads end here. -->
+					{@const prefs = resolveVoicePrefs(cfg)}
 					<MessageView
 						{open}
 						item={selectedItem}
-						engine={cfg.ttsEngine as EngineId}
-						voice={cfg.ttsVoice}
-						speed={cfg.ttsSpeed}
-						ramp={cfg.ttsRamp}
+						engine={prefs.engine}
+						voice={prefs.voice}
+						speed={prefs.speed}
+						ramp={prefs.ramp}
 						ondismiss={closeMessage}
 						onfullpage={openFullPage}
 						onsaved={(fresh) => (selectedItem = fresh)}

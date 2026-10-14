@@ -2,12 +2,11 @@ import { error } from '@sveltejs/kit';
 import { command, requested } from '$app/server';
 import { eq } from 'drizzle-orm';
 import * as v from 'valibot';
-import { requireUser } from '$lib/server/session';
+import { requireAiUser } from '$lib/server/guard';
 import { db } from '$lib/server/db';
 import { mailAccount, message } from '$lib/server/db/schema';
 import { detailsFor, listenScriptFor, organizeBatch } from '$lib/server/ai';
 import { organizePending } from '$lib/server/organize';
-import { getAiConfig } from '$lib/server/settings';
 import type { MessageDetails } from '$lib/types/mail';
 import { getInbox, getDigest, getMessage } from './mail.remote';
 import { cleanedBody } from '$lib/server/clean-body';
@@ -26,9 +25,7 @@ async function ownedMessage(userId: string, id: string) {
 
 /** Organize every message that has not been organized yet. */
 export const organizeMail = command(async () => {
-	const { user } = await requireUser();
-	const aiConfig = await getAiConfig(user.id);
-	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	const { user, aiConfig } = await requireAiUser();
 
 	const accounts = await db.select().from(mailAccount).where(eq(mailAccount.userId, user.id));
 	if (accounts.length === 0) error(400, 'Connect a Gmail account first.');
@@ -48,9 +45,7 @@ export const organizeMail = command(async () => {
 
 /** Re-run the AI for a single message (fixes a bad summary or category). */
 export const regenerateSummary = command(v.string(), async (id: string) => {
-	const { user } = await requireUser();
-	const aiConfig = await getAiConfig(user.id);
-	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	const { user, aiConfig } = await requireAiUser();
 
 	const target = await ownedMessage(user.id, id);
 
@@ -86,9 +81,7 @@ export const regenerateSummary = command(v.string(), async (id: string) => {
 
 /** Bullet details for one message — generated on first open, then served from the row. */
 export const loadDetails = command(v.string(), async (id: string) => {
-	const { user } = await requireUser();
-	const aiConfig = await getAiConfig(user.id);
-	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	const { user, aiConfig } = await requireAiUser();
 
 	const target = await ownedMessage(user.id, id);
 	if (target.details) {
@@ -112,9 +105,7 @@ export const loadDetails = command(v.string(), async (id: string) => {
 
 /** Spoken rewrite of a long body — generated on first play, then served from the row. */
 export const loadListenScript = command(v.string(), async (id: string) => {
-	const { user } = await requireUser();
-	const aiConfig = await getAiConfig(user.id);
-	if (!aiConfig) error(400, 'Set an AI endpoint (base URL + model) in Settings first.');
+	const { user, aiConfig } = await requireAiUser();
 
 	const target = await ownedMessage(user.id, id);
 	if (target.spokenText) return { id, spokenText: target.spokenText, cached: true };
