@@ -19,6 +19,7 @@
 	import { ENGINES, downloadEstimate } from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
 	import { onMount } from 'svelte';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import { appPlayer, type InlineRun, type PlayerStore, type ReaderItem } from '$lib/player.svelte';
 	import WordLine from './word-line.svelte';
 	import KeyboardHelp from './keyboard-help.svelte';
@@ -112,13 +113,44 @@
 		};
 	});
 
-	/** Long pastes scroll away — keep the spoken chunk in view, but only when it isn't. */
+	/**
+	 * Where the spoken sentence comes to rest while auto-scroll follows the voice.
+	 * `scrollIntoView({ block: 'nearest' })` cannot express this: it aligns the
+	 * bottom edge coming up from below but the top edge coming back from above, so
+	 * a sentence that drifted off the top landed flush against the top of the
+	 * screen — measured 72% down the screen from below, 0% from above. These two
+	 * numbers place it the same way either direction: it stays put while it is
+	 * inside the band, and lands at `FOLLOW_BAND_BOTTOM` when it leaves it.
+	 */
+	const FOLLOW_BAND_TOP = 0.3;
+	const FOLLOW_BAND_BOTTOM = 0.75;
+
+	/**
+	 * Long pastes scroll away — keep the spoken sentence in view, but only when it
+	 * isn't. Deliberately not `scrollIntoView` (see the band above): the follow is
+	 * symmetric, so the sentence lands in the same comfortable place whether it
+	 * drifted below or above. Instant, not smooth, when less motion was asked for.
+	 */
 	$effect(() => {
 		const current = store.sentenceIndex;
 		if (store.status !== 'playing' || !store.autoScroll.current || !chunkList) return;
-		chunkList
-			.querySelector(`[data-chunk="${current}"]`)
-			?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		const el = chunkList.querySelector(`[data-chunk="${current}"]`);
+		if (!el) return;
+		const box = el.getBoundingClientRect();
+		const viewport = window.innerHeight;
+		const bandTop = viewport * FOLLOW_BAND_TOP;
+		const bandBottom = viewport * FOLLOW_BAND_BOTTOM;
+		// A sentence taller than the band can never satisfy both edges: anchor by
+		// its top, so it still stops moving instead of scrolling on every word.
+		const settled =
+			box.height > bandBottom - bandTop
+				? box.top >= bandTop && box.top <= bandBottom
+				: box.top >= bandTop && box.bottom <= bandBottom;
+		if (settled) return;
+		window.scrollBy({
+			top: box.bottom - bandBottom,
+			behavior: prefersReducedMotion.current ? 'auto' : 'smooth'
+		});
 	});
 
 	/** "~4 min" / "~40s" — a progress number a listener can act on. */
@@ -165,7 +197,7 @@
 			role="button"
 			tabindex="0"
 			data-chunk={item.index}
-			class="reading-chunk cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {item.index ===
+			class="cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {item.index ===
 				store.sentenceIndex && store.playing
 				? 'bg-primary/15'
 				: 'text-muted-foreground'}"
@@ -416,8 +448,8 @@
 			transport: it floats over the tail of a long article and then settles into
 			its own row at the end, so nothing needs a fixed offset. It takes the
 			card's surface, because while stuck the text passes underneath it. The
-			chunk's `.reading-chunk` scroll margin keeps the spoken sentence well above
-			this bar: it is a reading comfort band, and the bar sits inside it.
+			follow band keeps the spoken sentence in the upper three quarters, so the
+			bar never covers the line being read.
 		-->
 		<div class="sticky bottom-0 z-10 border-t border-border bg-card py-2">
 			{@render controls()}

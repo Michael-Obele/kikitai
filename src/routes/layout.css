@@ -230,20 +230,3 @@
 .reading-window {
 	max-height: calc(16rem * var(--reader-scale));
 }
-
-/*
- * Where the spoken sentence comes to rest while auto-scroll follows the voice:
- * a quarter of the viewport above the bottom edge, so the line being read sits
- * in the comfortable part of the screen instead of crawling along the very
- * bottom. Measured before this: it stopped 57px (7% of the height) from the
- * bottom, which reads as "too close to the bottom of the screen".
- *
- * `scroll-margin-bottom` on the sentence itself, not `scroll-padding` on the
- * page: it is about one target, and the rest of the page's scrolling should not
- * move. It also clears the pinned transport bar with room to spare, so the two
- * rules no longer depend on each other — the bar could change height tomorrow
- * and this would still hold.
- */
-.reading-chunk {
-	scroll-margin-bottom: 25vh;
-}
