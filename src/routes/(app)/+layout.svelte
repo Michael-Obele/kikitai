@@ -3,6 +3,7 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import Player from '$lib/components/player/player.svelte';
+	import ScrollNav from '$lib/components/scroll-nav.svelte';
 	import { appPlayer } from '$lib/player.svelte';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { onDestroy } from 'svelte';
@@ -61,8 +62,12 @@
 				store's own session — content-identical, so `adopt()` is a no-op (an
 				empty `items` array would reset an idle session, and omitting speed
 				would let the persisted prefs clobber the live cap).
+
+				`data-bottom-chrome` lets `scroll-nav.svelte` park its pill above this
+				bar while the bar holds the bottom of the viewport.
 			-->
 			<div
+				data-bottom-chrome
 				class="sticky bottom-0 z-10 shrink-0 overflow-x-auto border-t border-border bg-background px-3 py-2 sm:px-4"
 			>
 				<Player
@@ -77,4 +82,8 @@
 			</div>
 		{/if}
 	</main>
+
+	<!-- One floating pill for every `(app)` route: the inbox list, the digest, a long
+	     message, the settings form. It measures the bar above and lifts clear of it. -->
+	<ScrollNav />
 </Sidebar.Provider>

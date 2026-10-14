@@ -450,8 +450,12 @@
 			card's surface, because while stuck the text passes underneath it. The
 			follow band keeps the spoken sentence in the upper three quarters, so the
 			bar never covers the line being read.
+
+			`data-bottom-chrome` tells `scroll-nav.svelte` this bar has the bottom of
+			the viewport while the article is on screen, so the pill parks above it
+			instead of on top of a control.
 		-->
-		<div class="sticky bottom-0 z-10 border-t border-border bg-card py-2">
+		<div data-bottom-chrome class="sticky bottom-0 z-10 border-t border-border bg-card py-2">
 			{@render controls()}
 		</div>
 	{:else}

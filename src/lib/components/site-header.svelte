@@ -49,6 +49,15 @@
 						{item.label}
 					</Button>
 				{/each}
+				<!--
+					The way in that needs no account, and the same link the mobile sheet
+					already carries. Signed-out only: a signed-in reader reaches it from
+					the sidebar's Public group, right beside the rest of the app. On
+					`/read` it would only point at the page you are already on.
+				-->
+				{#if !signedIn && !onRead}
+					<Button variant="ghost" size="sm" href={resolve('/read')}>Paste &amp; read</Button>
+				{/if}
 			</nav>
 
 			<ThemeToggle />
