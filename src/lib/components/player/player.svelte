@@ -19,7 +19,7 @@
 	import { ENGINES, downloadEstimate } from '$lib/tts';
 	import type { EngineId } from '$lib/tts';
 	import { onMount } from 'svelte';
-	import { appPlayer, type PlayerStore } from '$lib/player.svelte';
+	import { appPlayer, type InlineRun, type PlayerStore, type ReaderItem } from '$lib/player.svelte';
 	import WordLine from './word-line.svelte';
 	import KeyboardHelp from './keyboard-help.svelte';
 	import SpeedMenu from './speed-menu.svelte';
@@ -116,6 +116,18 @@
 		if (seconds < 60) return `~${Math.max(seconds, 1)}s`;
 		return `~${Math.round(seconds / 60)} min`;
 	}
+
+	/**
+	 * The emphasis a run carried, as classes. Markdown syntax never survives into
+	 * this: `runs` are already plain text, so nothing is ever spoken as "asterisk".
+	 */
+	function runClass(run: InlineRun): string {
+		if (run.code) return 'rounded-sm bg-muted px-1 font-mono text-[0.9em]';
+		if (run.strong) return 'font-semibold text-foreground';
+		if (run.em) return 'italic';
+		if (run.del) return 'line-through';
+		return '';
+	}
 </script>
 
 <!-- Keys are bound in the store via runed's PressedKeys — no window listener here. -->
@@ -123,6 +135,45 @@
 <!-- One place builds the progress line, so the card and the compact row can't drift apart. -->
 {#snippet progress()}
 	{store.sentenceIndex + 1}/{store.sentences.length} · {formatLeft(store.remaining)}
+{/snippet}
+
+<!--
+	A real <button> is layout-atomic in Chromium: even at display:inline it breaks
+	after every sentence (+32% paragraph height, measured). A span keeps the text
+	flowing; role/tabindex + keydown keep it operable (WCAG 2.1.1). One snippet
+	serves every Markdown block, so a heading, a quote and a list item are all
+	clickable the same way.
+
+	The `{' '}` closing each sentence is load-bearing, not decoration: the compiler
+	trims template whitespace that sits between blocks, so without it two chunks
+	run together as "…your own plan.Here's the honest answer" (measured gap 0px).
+-->
+{#snippet chunks(list: ReaderItem[])}
+	{#each list as item (item.index)}
+		{@const spoken = item.index === store.sentenceIndex && store.pointer?.text === item.text}
+		<span
+			role="button"
+			tabindex="0"
+			data-chunk={item.index}
+			class="cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {item.index ===
+				store.sentenceIndex && store.playing
+				? 'bg-primary/15'
+				: 'text-muted-foreground'}"
+			onclick={() => store.speakFrom(item.index)}
+			onkeydown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					store.speakFrom(item.index);
+				}
+			}}
+		>
+			{#if spoken}<WordLine
+					text={item.text}
+					word={store.pointer?.word ?? -1}
+				/>{:else}{#each item.runs as run, runIndex (runIndex)}<span class={runClass(run)}>{run.text}</span
+					>{/each}{/if}
+		</span>{' '}
+	{/each}
 {/snippet}
 
 <div class={compact ? 'flex items-center gap-2' : 'space-y-4'}>
@@ -147,35 +198,53 @@
 			{#if store.current.title}
 				<p class="mt-1 text-sm font-medium">{store.current.title}</p>
 			{/if}
-			<p bind:this={chunkList} class="mt-2 text-sm leading-relaxed">
-				{#each store.sentences as part, i (i)}
-					<!--
-						A real <button> is layout-atomic in Chromium: even at display:inline it
-						breaks after every sentence (+32% paragraph height, measured). A span keeps
-						the text flowing; role/tabindex + keydown keep it operable (WCAG 2.1.1).
-					-->
-					<span
-						role="button"
-						tabindex="0"
-						data-chunk={i}
-						class="cursor-pointer transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/30 {i ===
-							store.sentenceIndex && store.playing
-							? 'bg-primary/15'
-							: 'text-muted-foreground'}"
-						onclick={() => store.speakFrom(i)}
-						onkeydown={(event) => {
-							if (event.key === 'Enter' || event.key === ' ') {
-								event.preventDefault();
-								store.speakFrom(i);
-							}
-						}}
-					>
-						{#if i === store.sentenceIndex && store.pointer && store.pointer.text === part}
-							<WordLine text={part} word={store.pointer.word} />
-						{:else}{part}{/if}
-					</span>
+			<!--
+				The pasted text as the reader wrote it: one element per Markdown block, so
+				paragraphs stay apart, headings stay headings and a quote stays quoted.
+				Bullets and numbers come from `block.marker` — the syntax that produced
+				them is already gone, which is why the voice never reads it.
+			-->
+			<div bind:this={chunkList} class="mt-2 space-y-2 text-sm leading-relaxed">
+				{#each store.reader.rows as row}
+					{#if row.kind === 'list'}
+						<svelte:element this={row.ordered ? 'ol' : 'ul'} role="list" class="ml-4 space-y-1">
+							{#each row.items as item}
+								<li>
+									<!--
+										The marker is drawn, not inherited: `list-style` is off (Tailwind's
+										preflight), so the browser would otherwise draw a second bullet beside this
+										one — and an <ol> would restart at 1 instead of honouring its `start`.
+										It is decoration: `role="list"` above is what tells a screen reader.
+									-->
+									<span class="mr-1 text-muted-foreground" aria-hidden="true"
+										>{item.block.marker}</span
+									>{@render chunks(item.items)}
+								</li>
+							{/each}
+						</svelte:element>
+					{:else if row.block.kind === 'rule'}
+						<hr class="border-border" />
+					{:else if row.block.kind === 'code'}
+						<pre
+							class="overflow-x-auto rounded-sm bg-muted p-3 font-mono text-xs whitespace-pre-wrap">{@render chunks(
+								row.items
+							)}</pre>
+					{:else if row.block.kind === 'quote'}
+						<blockquote class="border-l-2 border-border pl-3 text-muted-foreground italic">
+							<p>{@render chunks(row.items)}</p>
+						</blockquote>
+					{:else if row.block.kind === 'heading'}
+						<svelte:element
+							this={`h${row.block.depth ?? 2}`}
+							class="pt-2 font-heading font-semibold text-foreground"
+						>
+							{@render chunks(row.items)}
+						</svelte:element>
+					{:else}
+						<p>{@render chunks(row.items)}</p>
+					{/if}
 				{/each}
-			</p>
+			</div>
 		</div>
 	{/if}
 

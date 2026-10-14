@@ -21,9 +21,104 @@ import {
 } from '$lib/tts';
 import type { EngineId, PreparedSpeech } from '$lib/tts';
 import { recordTts, sessionId } from '$lib/tts/telemetry';
+import { parseMarkdown, type InlineRun, type MdBlock } from '$lib/markdown';
 
 export type PlayerItem = { id: string; text: string; title?: string };
 export type Pointer = { chunk: number; word: number; text: string } | null;
+
+/** One spoken chunk, plus the emphasis its slice of the block carried. */
+export type ReaderItem = { index: number; text: string; runs: InlineRun[] };
+export type ReaderBlock = { block: MdBlock; items: ReaderItem[] };
+/** A row of the reading view: one block, or a run of list items sharing a list. */
+export type ReaderRow =
+	| { kind: 'block'; block: MdBlock; items: ReaderItem[] }
+	| { kind: 'list'; ordered: boolean; items: ReaderBlock[] };
+export type Reading = { sentences: string[]; rows: ReaderRow[] };
+
+export type { InlineRun, MdBlock };
+
+const EMPTY_READING: Reading = { sentences: [], rows: [] };
+
+/** The runs covering `[start, end)` of a block's plain text. */
+function sliceRuns(runs: InlineRun[], start: number, end: number): InlineRun[] {
+	const out: InlineRun[] = [];
+	for (const run of runs) {
+		const from = Math.max(run.start, start);
+		const to = Math.min(run.end, end);
+		if (to <= from) continue;
+		out.push({
+			...run,
+			start: from,
+			end: to,
+			text: run.text.slice(from - run.start, to - run.start)
+		});
+	}
+	return out;
+}
+
+/**
+ * The one place an item's text becomes chunks. The reading view, the play loop
+ * and the next-item prefetch all come through here, so a `data-chunk` index
+ * always names the chunk the engine is asked to speak.
+ *
+ * Markdown is handled once, on the way in: `parseMarkdown` returns blocks whose
+ * `plain` has its markers removed already, which is why nothing downstream ever
+ * says "asterisk" — the engines only ever see these strings.
+ */
+export function readingFor(text: string): Reading {
+	const blocks = parseMarkdown(text);
+	const perBlock = blocks.map((block) => toSentences(block.plain));
+	const sentences = firstChunk(perBlock.flat());
+	// `firstChunk` caps the whole text's first chunk; when it splits, the extra
+	// entry belongs to the first block that produced a sentence.
+	const extra = sentences.length - perBlock.reduce((n, parts) => n + parts.length, 0);
+	const first = perBlock.findIndex((parts) => parts.length > 0);
+
+	let at = 0;
+	const rows: ReaderRow[] = [];
+	let pending: ReaderBlock[] = [];
+	const flush = () => {
+		if (!pending.length) return;
+		rows.push({ kind: 'list', ordered: pending[0]!.block.ordered === true, items: pending });
+		pending = [];
+	};
+
+	blocks.forEach((block, i) => {
+		const count = (perBlock[i]?.length ?? 0) + (i === first ? extra : 0);
+		// A sentence is a trimmed slice of the block's plain text, so it can look up
+		// its own runs by search. `toSentences` only trims and re-glues whitespace,
+		// so a miss is rare and falls back to the sentence as unformatted text.
+		let cursor = 0;
+		const items: ReaderItem[] = [];
+		for (let n = 0; n < count; n++) {
+			const sentence = sentences[at + n]!;
+			const found = block.plain.indexOf(sentence, cursor);
+			if (found >= 0) cursor = found + sentence.length;
+			items.push({
+				index: at + n,
+				text: sentence,
+				runs:
+					found < 0
+						? [{ start: 0, end: sentence.length, text: sentence }]
+						: sliceRuns(block.runs, found, found + sentence.length)
+			});
+		}
+		at += count;
+
+		if (block.kind === 'list-item') {
+			// Consecutive items of one list share a <ul>/<ol>; a change of kind
+			// starts a new one.
+			if (pending.length && pending[0]!.block.ordered !== block.ordered) flush();
+			pending.push({ block, items });
+			return;
+		}
+		flush();
+		rows.push({ kind: 'block', block, items });
+	});
+	flush();
+
+	return { sentences, rows };
+}
 
 const RAMP_MS = 120_000;
 
@@ -74,8 +169,10 @@ export function createPlayer() {
 	/** True from Play until the first chunk actually starts sounding. */
 	let preparing = $state(false);
 	let current = $derived(items[index] ?? null);
+	/** The reading view's own model: the chunks, plus the blocks they came from. */
+	let reading = $derived(current ? readingFor(current.text) : EMPTY_READING);
 	/** Same split the play loop uses, so the highlight tracks the real chunk. */
-	let sentences = $derived(current ? firstChunk(toSentences(current.text)) : []);
+	let sentences = $derived(reading.sentences);
 	let playing = $derived(status === 'playing' || status === 'loading');
 
 	// --- speed -------------------------------------------------------------
@@ -431,7 +528,7 @@ export function createPlayer() {
 		for (let i = first; i < items.length; i++) {
 			if (run !== myRun) return;
 			index = i;
-			const parts = firstChunk(toSentences(items[i]!.text));
+			const parts = readingFor(items[i]!.text).sentences;
 			// An item with no sentences at all (a digest row whose summary came back
 			// empty joins to '') would make `parts.length - 1` = -1 and index the
 			// array at -1, so `prepare` throws on `undefined.trim()` and one empty row
@@ -467,7 +564,7 @@ export function createPlayer() {
 				// Tail of an item: bank the next item's opener while this chunk plays,
 				// so the boundary between messages never pays a cold generation gap.
 				if (s === parts.length - 1 && i + 1 < items.length) {
-					const opener = firstChunk(toSentences(items[i + 1]!.text))[0];
+					const opener = readingFor(items[i + 1]!.text).sentences[0];
 					const nextKey = opener ? openerKey(engine, voice, liveSpeed, opener) : null;
 					if (opener && nextKey && !warmed.has(nextKey)) {
 						const job = chain.then(() => {
@@ -979,6 +1076,10 @@ export function createPlayer() {
 		},
 		get sentences() {
 			return sentences;
+		},
+		/** The reader view's blocks; the component paints these instead of one paragraph. */
+		get reader() {
+			return reading;
 		},
 		get playing() {
 			return playing;
