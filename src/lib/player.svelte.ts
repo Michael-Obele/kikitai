@@ -233,6 +233,11 @@ export function createPlayer() {
 		if (/out of memory|no available backend|Aborted/i.test(message)) {
 			return 'The voice model ran out of memory. Close a few tabs and press Play again — or switch to Web Speech.';
 		}
+		// The browser's own words for a module the network never delivered. It names
+		// the CDN URL and says nothing a listener can act on.
+		if (/dynamically imported module|Failed to fetch|NetworkError|Load failed/i.test(message)) {
+			return 'Could not reach the voice engine download. Check your connection and press Play again.';
+		}
 		return message || 'Could not load the voice model.';
 	}
 
@@ -477,7 +482,7 @@ export function createPlayer() {
 				try {
 					prepared = await queued.get(s)!;
 				} catch (error) {
-					toast.error(error instanceof Error ? error.message : String(error));
+					toast.error(loadErrorHint(error));
 					// Never leave the transport stuck on "playing" after a failed prepare.
 					if (run === myRun) status = 'idle';
 					return;

@@ -82,11 +82,56 @@ export type LoadStats = {
 export type LoadedModel = { model: ModelHandle; stats: LoadStats };
 export type LoadOptions = { cdnBase: string; modelBase?: string };
 
-let kitten: Promise<LoadedModel> | null = null;
-let kokoro: Promise<LoadedModel> | null = null;
+/** The shapes jsDelivr's ESM builds hand back — all we touch of each module. */
+type KittenModule = {
+	KittenTTS: { from_pretrained: (id: string) => Promise<ModelHandle> };
+};
+type KokoroModule = {
+	KokoroTTS: {
+		from_pretrained: (id: string, opts?: Record<string, unknown>) => Promise<ModelHandle>;
+	};
+};
 
-async function loadKitten(options: LoadOptions): Promise<LoadedModel> {
-	if (!kitten) {
+/** In-flight load per engine. A failure is never left in here — see `once()`. */
+const loading: Record<LocalEngine, Promise<LoadedModel> | null> = { kitten: null, kokoro: null };
+
+/**
+ * Share one in-flight load between concurrent callers, but never remember a
+ * failure. A dead CDN request used to be permanent: the rejected promise stayed
+ * in the slot, so every later Play press re-threw the same cached error — naming
+ * a URL it never tried again — until the whole page was reloaded.
+ */
+function once(engine: LocalEngine, load: () => Promise<LoadedModel>): Promise<LoadedModel> {
+	const pending = loading[engine];
+	if (pending) return pending;
+	let started: Promise<LoadedModel>;
+	started = load().catch((error: unknown) => {
+		if (loading[engine] === started) loading[engine] = null;
+		throw error;
+	});
+	loading[engine] = started;
+	return started;
+}
+
+/**
+ * The engine module arrives through jsDelivr's on-demand ESM transform, and BOTH
+ * local engines pull `phonemizer@1.2.1` through it — 690 KB of brotli'd
+ * JavaScript that the CDN has to build the first time anyone asks for it
+ * (measured at 61 s cold from here). A phone dropping that connection is the
+ * "Failed to fetch dynamically imported module" the reader saw. One immediate
+ * retry absorbs a blip; a real outage still fails, 400 ms later.
+ */
+async function importEngineModule<T>(engine: LocalEngine, cdnBase: string): Promise<T> {
+	try {
+		return (await import(/* @vite-ignore */ `${cdnBase}/${TTS_MODULES[engine]}`)) as T;
+	} catch {
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		return (await import(/* @vite-ignore */ `${cdnBase}/${TTS_MODULES[engine]}`)) as T;
+	}
+}
+
+function loadKitten(options: LoadOptions): Promise<LoadedModel> {
+	return once('kitten', () => {
 		const started = performance.now();
 		let mirrored = false;
 		let fetchMs = 0;
@@ -97,7 +142,7 @@ async function loadKitten(options: LoadOptions): Promise<LoadedModel> {
 		let primeMs = 0;
 		let modMs = 0;
 		let modelMs = 0;
-		kitten = seedKittenModel(options.modelBase)
+		return seedKittenModel(options.modelBase)
 			.catch(() => ({ ok: false, fetchMs: 0 }))
 			.then((seeded) => {
 				mirrored = seeded.ok;
@@ -110,7 +155,7 @@ async function loadKitten(options: LoadOptions): Promise<LoadedModel> {
 			})
 			.then(() => {
 				const t = performance.now();
-				return import(/* @vite-ignore */ `${options.cdnBase}/${TTS_MODULES.kitten}`).finally(() => {
+				return importEngineModule<KittenModule>('kitten', options.cdnBase).finally(() => {
 					modMs = Math.round(performance.now() - t);
 				});
 			})
@@ -129,30 +174,24 @@ async function loadKitten(options: LoadOptions): Promise<LoadedModel> {
 					phases: { seed: seedMs, prime: primeMs, mod: modMs, model: modelMs }
 				}
 			}));
-	}
-	return kitten;
+	});
 }
 
-async function loadKokoro(options: LoadOptions): Promise<LoadedModel> {
-	if (!kokoro) {
+function loadKokoro(options: LoadOptions): Promise<LoadedModel> {
+	return once('kokoro', () => {
 		const started = performance.now();
 		// WebGPU wants fp32 (kokoro-js recommends it; int8 is the slow path on GPU).
 		// fp32+WASM measured RTF ~1.6 here — too slow to keep up with playback.
 		const gpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
 		let modMs = 0;
 		let modelMs = 0;
-		type KokoroModule = {
-			KokoroTTS: {
-				from_pretrained: (id: string, opts?: Record<string, unknown>) => Promise<ModelHandle>;
-			};
-		};
 		const importMod = () => {
 			const t = performance.now();
-			return import(/* @vite-ignore */ `${options.cdnBase}/${TTS_MODULES.kokoro}`).finally(() => {
+			return importEngineModule<KokoroModule>('kokoro', options.cdnBase).finally(() => {
 				modMs = Math.round(performance.now() - t);
 			});
 		};
-		kokoro = importMod()
+		return importMod()
 			.then((mod: KokoroModule) => {
 				const t = performance.now();
 				return mod.KokoroTTS.from_pretrained(
@@ -184,8 +223,7 @@ async function loadKokoro(options: LoadOptions): Promise<LoadedModel> {
 					phases: { mod: modMs, model: modelMs }
 				}
 			}));
-	}
-	return kokoro;
+	});
 }
 
 export function loadLocal(engine: LocalEngine, options: LoadOptions): Promise<LoadedModel> {
@@ -201,8 +239,8 @@ export function loadLocal(engine: LocalEngine, options: LoadOptions): Promise<Lo
  */
 export async function releaseLocal(engine: LocalEngine): Promise<void> {
 	if (engine === 'kitten') {
-		const pending = kitten;
-		kitten = null;
+		const pending = loading.kitten;
+		loading.kitten = null;
 		if (!pending) return;
 		try {
 			// kokoro-js exposes no release: dropping the last reference is the free.
@@ -212,8 +250,8 @@ export async function releaseLocal(engine: LocalEngine): Promise<void> {
 		}
 		return;
 	}
-	const pending = kokoro;
-	kokoro = null;
+	const pending = loading.kokoro;
+	loading.kokoro = null;
 	if (!pending) return;
 	try {
 		const entry = await pending;
