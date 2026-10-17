@@ -1,0 +1,23 @@
+{
+	"servers": {
+		"svelte": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@sveltejs/mcp"]
+		},
+		"tauri-docs": {
+			"type": "http",
+			"url": "https://tauri-docs.mastra.cloud/api/mcp/tauri-docs-mcp/mcp"
+		},
+		"awesome-ionic-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "awesome-ionic-mcp@latest"]
+		},
+		"android-docs": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@arabold/docs-mcp-server@latest"]
+		}
+	}
+}
