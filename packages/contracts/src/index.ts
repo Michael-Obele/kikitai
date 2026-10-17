@@ -50,13 +50,18 @@ export const classificationSchema = v.object({
 });
 export type Classification = v.InferOutput<typeof classificationSchema>;
 
+export const dateOrStringSchema = v.pipe(
+	v.union([v.date(), v.string()]),
+	v.transform((d) => (typeof d === 'string' ? new Date(d) : d))
+);
+
 export const messageDtoSchema = v.object({
 	id: v.string(),
 	gmailId: v.string(),
 	subject: v.string(),
 	fromName: v.string(),
 	fromEmail: v.string(),
-	receivedAt: v.date(),
+	receivedAt: dateOrStringSchema,
 	snippet: v.string(),
 	bodyText: v.string(),
 	labelIds: v.array(v.string()),
@@ -71,7 +76,7 @@ export const messageDtoSchema = v.object({
 	cleanBody: v.nullable(v.string()),
 	/** Messages in this conversation (local sync); only `getMessage` fills it. */
 	threadCount: v.optional(v.number()),
-	organizedAt: v.nullable(v.date()),
+	organizedAt: v.nullable(dateOrStringSchema),
 	organizeError: v.nullable(v.string()),
 	isDigested: v.boolean()
 });
@@ -118,10 +123,24 @@ export const settingsFormSchema = v.object({
 });
 export type SettingsFormInput = v.InferOutput<typeof settingsFormSchema>;
 
+export const settingsUpdateSchema = v.object({
+	aiBaseUrl: v.optional(v.pipe(v.string(), v.maxLength(300))),
+	aiModel: v.optional(v.pipe(v.string(), v.maxLength(120))),
+	aiKey: v.optional(v.pipe(v.string(), v.maxLength(500))),
+	ttsEngine: v.optional(ttsEngineSchema),
+	ttsVoice: v.optional(v.pipe(v.string(), v.maxLength(80))),
+	ttsSpeed: v.optional(v.pipe(v.number(), v.minValue(0.5), v.maxValue(3))),
+	ttsRamp: v.optional(v.boolean()),
+	syncWindowDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(30)))
+});
+export type SettingsUpdateInput = v.InferOutput<typeof settingsUpdateSchema>;
+
 export const inboxFilterSchema = v.object({
 	category: v.optional(v.union([categorySchema, v.literal('all')])),
 	priority: v.optional(v.union([v.literal('all'), v.literal('high'), v.literal('unorganized')])),
-	search: v.optional(v.string())
+	search: v.optional(v.string()),
+	limit: v.optional(v.pipe(v.unknown(), v.transform((val) => (val !== undefined ? Number(val) : undefined)))),
+	offset: v.optional(v.pipe(v.unknown(), v.transform((val) => (val !== undefined ? Number(val) : undefined))))
 });
 export type InboxFilter = v.InferOutput<typeof inboxFilterSchema>;
 
@@ -131,7 +150,7 @@ export const digestItemSchema = v.object({
 	fromName: v.string(),
 	summary: v.string(),
 	priority: v.number(),
-	receivedAt: v.date(),
+	receivedAt: dateOrStringSchema,
 	actionItems: v.array(v.string()),
 	facts: v.nullable(factsSchema)
 });
@@ -145,3 +164,28 @@ export const syncResultSchema = v.object({
 	failed: v.number()
 });
 export type SyncResult = v.InferOutput<typeof syncResultSchema>;
+
+export const importUrlInputSchema = v.object({
+	url: v.pipe(v.string(), v.minLength(1, 'Please enter a URL'))
+});
+export type ImportUrlInput = v.InferOutput<typeof importUrlInputSchema>;
+
+export const importedPageSchema = v.object({
+	title: v.string(),
+	text: v.string(),
+	url: v.string()
+});
+export type ImportedPage = v.InferOutput<typeof importedPageSchema>;
+
+export const synthesizeInputSchema = v.object({
+	text: v.pipe(v.string(), v.minLength(1)),
+	engine: v.optional(ttsEngineSchema),
+	voice: v.optional(v.string()),
+	ssml: v.optional(v.boolean())
+});
+export type SynthesizeInput = v.InferOutput<typeof synthesizeInputSchema>;
+
+export const organizeInputSchema = v.object({
+	messageId: v.optional(v.string())
+});
+export type OrganizeInput = v.InferOutput<typeof organizeInputSchema>;

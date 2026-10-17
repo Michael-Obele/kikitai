@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
+import { bearer } from 'better-auth/plugins';
 import { getRequestEvent } from '$app/server';
 import { db } from '$lib/server/db';
 
@@ -10,10 +11,17 @@ export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 const normalizeOrigin = (s: string) => s.trim().replace(/\/+$/, '');
 
-/** All public origins: canonical ORIGIN + comma-separated TRUSTED_ORIGINS. */
+const appScheme = env.APP_SCHEME || 'kikitai';
+
+/** All public origins: canonical ORIGIN + TRUSTED_ORIGINS + native webview schemes. */
 const allOrigins = [
 	env.ORIGIN ? normalizeOrigin(env.ORIGIN) : '',
-	...(env.TRUSTED_ORIGINS ?? '').split(',').map(normalizeOrigin).filter(Boolean)
+	...(env.TRUSTED_ORIGINS ?? '').split(',').map(normalizeOrigin).filter(Boolean),
+	'capacitor://localhost',
+	'https://localhost',
+	'tauri://localhost',
+	'http://tauri.localhost',
+	`${appScheme}://*`
 ].filter(Boolean) as string[];
 
 const hostOf = (origin: string): string | null => {
@@ -64,6 +72,9 @@ export const auth = betterAuth({
 		}
 	},
 	plugins: [
+		bearer({
+			requireSignature: true
+		}),
 		sveltekitCookies(getRequestEvent) // make sure this is the last plugin in the array
 	]
 });
