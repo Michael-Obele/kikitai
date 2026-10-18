@@ -13,8 +13,10 @@
 # (Gatekeeper/SmartScreen will warn — signing identities come later).
 name: release
 on:
+  # `v*` after `include-component-in-tag: false`; the one legacy
+  # `kikitai-monorepo-v*` tag from the first unified release also matches.
   push:
-    tags: ['v*']
+    tags: ['v*', 'kikitai-monorepo-v*']
   workflow_dispatch:
 jobs:
   create-release:
