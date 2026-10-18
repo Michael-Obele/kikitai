@@ -7,6 +7,7 @@ Kikitai uses **Vite+** (`vite-plus` / `vp` CLI by VoidZero) layered on top of **
 ## 1. How Vite+ and Bun Workspaces Fit Together
 
 Vite+ does **not** replace Bun's workspace resolution or `bun.lock`. Instead:
+
 - **Bun** owns the workspace dependency graph (`"workspaces": ["apps/*", "packages/*"]` in root `package.json`, `"workspace:*"` links, and `bun.lock`).
 - **Vite+ (`vp`)** detects `bun.lock` (or `"packageManager": "bun@1.4.3"`) automatically and wraps package management (`vp install`, `vp add`, `vp remove`), app commands (`vp dev`, `vp build`, `vp preview`), library packaging (`vp pack` via `tsdown`), linting/typechecking (`vp check`, `vp lint` via `Oxlint`), and monorepo task orchestration (`vp run` / `vpr` via **Vite Task**, replacing Turborepo).
 
@@ -45,9 +46,11 @@ kikitai/
 Per the [Vite+ Migration Rules](https://viteplus.dev/guide/migrate-rules), **`vp migrate` on a monorepo must run from the workspace root** — Vite+ cannot migrate a single workspace member in isolation because it reconciles shared overrides, dependency catalogs, and the root lockfile.
 
 ### Step 3.1: Move Current Tree to `apps/web`
+
 Move the existing SvelteKit app into `apps/web` via `git mv` so relative paths inside `apps/web` (`./src/lib/server/db/schema.ts`, `../drizzle.config.ts`) remain intact.
 
 ### Step 3.2: Create Root `package.json` & `packages/contracts`
+
 Create the workspace root `package.json` and pin `vite` / `vitest` overrides for Bun:
 
 ```json
@@ -55,10 +58,7 @@ Create the workspace root `package.json` and pin `vite` / `vitest` overrides for
 	"name": "kikitai-monorepo",
 	"private": true,
 	"packageManager": "bun@1.4.3",
-	"workspaces": [
-		"apps/*",
-		"packages/*"
-	],
+	"workspaces": ["apps/*", "packages/*"],
 	"scripts": {
 		"dev": "vp dev",
 		"build": "vp run -r build",
@@ -83,6 +83,7 @@ Create the workspace root `package.json` and pin `vite` / `vitest` overrides for
 > In a Bun workspace, `overrides.vite` points all transitive `vite` imports to `npm:@voidzero-dev/vite-plus-core@<version>` (preventing duplicate Vite instances across plugins), **and** `apps/web/package.json` keeps `"vite": "npm:@voidzero-dev/vite-plus-core@<version>"` as a direct `devDependency` so Bun's peer resolver sees the provider before applying overrides.
 
 ### Step 3.3: Install or Invoke `vp` and Run `vp migrate`
+
 Install the global `vp` CLI (or run one-shot via `npx` on Node `^22.18.0 || ^24.11.0 || >=26.0.0`):
 
 ```bash
@@ -94,11 +95,13 @@ npx --package=vite-plus@latest vp migrate --no-interactive --no-hooks
 ```
 
 What `vp migrate` updates automatically:
+
 1. Aligns `vite-plus` and `vite` (`@voidzero-dev/vite-plus-core`) versions across root and `apps/*`.
 2. Rewrites `import { defineConfig } from 'vite'` to `import { defineConfig } from 'vite-plus'` in config entry files (`vite.config.ts`), while preserving `type Plugin` or runtime imports from `'vite'`.
 3. Rewrites `vite dev` / `vite build` / `vite preview` scripts to `vp dev` / `vp build` / `vp preview`.
 
 ### Step 3.4: Configure Root `vite.config.ts`
+
 At the workspace root, `vite.config.ts` configures `defaultPackage`, **Vite Task (`run`)**, and **Oxlint (`lint`)**:
 
 ```ts
@@ -159,20 +162,21 @@ export default defineConfig({
 ## 4. Command Reference (`vp` vs `vp run` / `vpr`)
 
 ### Built-in Commands vs. Workspace Tasks
+
 Vite+ strictly separates **built-in toolchain commands** from **`package.json` scripts / `run.tasks`**:
 
-| Command | What it executes |
-| :--- | :--- |
-| `vp install` | Detects `bun.lock` and runs `bun install` across all workspaces |
-| `vp add <pkg> --filter @kikitai/web` | Adds a dependency to a specific workspace package |
-| `vp dev` | Runs `vp -C apps/web dev` automatically via `defaultPackage: './apps/web'` |
-| `vp -C apps/mobile dev` | Runs `vp dev` as if `cd apps/mobile` was run first (`process.cwd()` is `apps/mobile`) |
-| `vp run <task>` (or `vpr <task>`) | Runs a task from `vite.config.ts#run.tasks` (cached) or script from `package.json` |
-| `vp run -r build` (`vpr -r build`) | Runs `build` across all workspace packages in topological dependency order |
-| `vp run -t @kikitai/web#build` | Runs `build` in `@kikitai/web` and all of its transitive workspace dependencies |
-| `vp run --filter ./apps/web db:push` | Runs `db:push` script scoped to `apps/web` |
-| `vp run -r -v build` | Prints the Vite+ Task Runner Execution Summary with cache hit rates and time saved |
-| `vp cache clean` | Clears `node_modules/.vite/task-cache` |
+| Command                              | What it executes                                                                      |
+| :----------------------------------- | :------------------------------------------------------------------------------------ |
+| `vp install`                         | Detects `bun.lock` and runs `bun install` across all workspaces                       |
+| `vp add <pkg> --filter @kikitai/web` | Adds a dependency to a specific workspace package                                     |
+| `vp dev`                             | Runs `vp -C apps/web dev` automatically via `defaultPackage: './apps/web'`            |
+| `vp -C apps/mobile dev`              | Runs `vp dev` as if `cd apps/mobile` was run first (`process.cwd()` is `apps/mobile`) |
+| `vp run <task>` (or `vpr <task>`)    | Runs a task from `vite.config.ts#run.tasks` (cached) or script from `package.json`    |
+| `vp run -r build` (`vpr -r build`)   | Runs `build` across all workspace packages in topological dependency order            |
+| `vp run -t @kikitai/web#build`       | Runs `build` in `@kikitai/web` and all of its transitive workspace dependencies       |
+| `vp run --filter ./apps/web db:push` | Runs `db:push` script scoped to `apps/web`                                            |
+| `vp run -r -v build`                 | Prints the Vite+ Task Runner Execution Summary with cache hit rates and time saved    |
+| `vp cache clean`                     | Clears `node_modules/.vite/task-cache`                                                |
 
 ---
 
