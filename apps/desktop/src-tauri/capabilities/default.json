@@ -1,0 +1,13 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "default",
+	"description": "Least-privilege for Kikitai Read desktop.",
+	"windows": ["main"],
+	"permissions": [
+		"core:default",
+		"core:window:allow-close",
+		"core:window:allow-minimize",
+		"core:window:allow-maximize",
+		"core:window:allow-start-dragging"
+	]
+}

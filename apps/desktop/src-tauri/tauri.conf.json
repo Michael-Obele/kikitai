@@ -1,0 +1,21 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "Kikitai Read",
+	"version": "0.0.1",
+	"identifier": "me.svelteapps.kikitai.read",
+	"build": {
+		"devUrl": "http://localhost:5174",
+		"frontendDist": "../build",
+		"beforeDevCommand": "bun run --filter @kikitai/desktop dev",
+		"beforeBuildCommand": "bun run --filter @kikitai/desktop build"
+	},
+	"app": {
+		"windows": [{ "title": "Kikitai Read", "width": 1100, "height": 750 }],
+		"security": {
+			"headers": {
+				"Cross-Origin-Opener-Policy": "same-origin",
+				"Cross-Origin-Embedder-Policy": "credentialless"
+			}
+		}
+	}
+}

@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+	color-scheme: light;
+	--background: oklch(0.985 0.003 90);
+	--foreground: oklch(0.19 0.02 285);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.19 0.02 285);
+	--primary: oklch(0.48 0.27 288);
+	--primary-foreground: oklch(0.99 0.005 285);
+	--secondary: oklch(0.96 0.008 285);
+	--secondary-foreground: oklch(0.28 0.02 285);
+	--muted: oklch(0.965 0.006 285);
+	--muted-foreground: oklch(0.52 0.02 285);
+	--accent: oklch(0.95 0.022 288);
+	--accent-foreground: oklch(0.32 0.16 288);
+	--border: oklch(0.9 0.008 285);
+	--input: oklch(0.9 0.008 285);
+	--ring: oklch(0.48 0.27 288);
+	/* Reading typography defaults — same contract as apps/web `reader-prefs`
+	   (`DEFAULT_READER_PREFS`); the full preference control lands with the player. */
+	--reader-scale: 1;
+	--reader-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--reader-heading-font:
+		system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--reader-leading: 1.625;
+}
+
+.dark {
+	color-scheme: dark;
+	--background: oklch(0.16 0.014 285);
+	--foreground: oklch(0.97 0.005 285);
+	--card: oklch(0.205 0.016 285);
+	--card-foreground: oklch(0.97 0.005 285);
+	--primary: oklch(0.68 0.2 288);
+	--primary-foreground: oklch(0.16 0.02 285);
+	--secondary: oklch(0.26 0.016 285);
+	--secondary-foreground: oklch(0.97 0.005 285);
+	--muted: oklch(0.26 0.016 285);
+	--muted-foreground: oklch(0.72 0.015 285);
+	--accent: oklch(0.3 0.05 288);
+	--accent-foreground: oklch(0.93 0.03 288);
+	--border: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 16%);
+	--ring: oklch(0.68 0.2 288);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+}
