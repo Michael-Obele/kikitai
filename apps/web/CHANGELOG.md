@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Michael-Obele/kikitai/compare/web-v0.1.1...web-v0.1.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **netlify:** build web workspace from repo root ([b18ea84](https://github.com/Michael-Obele/kikitai/commit/b18ea847970898c94891e7c77ef687e4986b09a7))
+
 ## [0.1.1](https://github.com/Michael-Obele/kikitai/compare/web-v0.1.0...web-v0.1.1) (2026-10-18)
 
 
