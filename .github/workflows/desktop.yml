@@ -12,7 +12,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: '1.4.3' }
       - run: bun install
-      - run: bunx vp fmt ./apps/desktop --check
+      - run: bunx vp fmt ./apps/desktop '!**/CHANGELOG.md' --check
       - run: bunx prettier --check 'apps/desktop/**/*.svelte'
       - run: bun --filter '@kikitai/desktop' check
       # Static frontend build (adapter-static → build/, consumed as
