@@ -23,9 +23,6 @@ jobs:
           # (no quotes: the action passes each token straight to sdkmanager).
           packages: platform-tools platforms;android-36 build-tools;36.0.0
       - uses: gradle/actions/setup-gradle@v4
-        # AGP 9.x needs Gradle 9.x (BOM 2026.09.00 artifacts require AGP 9.1+,
-        # which needs Gradle 9.3.1+).
+        # AGP 9.x needs Gradle 9.x (M3 1.4.0-era artifacts need AGP 8.6+, current pin is 9.1).
         with: { gradle-version: '9.3.1' }
-      # TEMP-DEBUG: print resolved material3/compose/kotlin versions.
-      - run: gradle -p apps/android-native :app:dependencies --configuration debugCompileClasspath --console=plain | grep -iE 'material3|androidx.compose.(ui|runtime|foundation)|kotlin-stdlib|compose.compiler' | head -n 40
       - run: gradle -p apps/android-native assembleDebug --console=plain

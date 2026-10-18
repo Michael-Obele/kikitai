@@ -5,10 +5,10 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 
 # Kotlin + Compose Material 3 Expressive (`apps/android-native`)
 
-## 1. Stack & `MaterialExpressiveTheme` (`material3:1.4.0`)
+## 1. Stack & Theming (`material3:1.4.0` — Expressive BLOCKED, see below)
 
 - **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), AGP `9.1.0` + Gradle `9.3.1` + JDK 17 (AGP 9 ships built-in Kotlin — do NOT apply `org.jetbrains.kotlin.android`), `material3:1.4.0` + `material3-window-size-class:1.4.0` + `material3-adaptive-navigation-suite:1.4.0` (**no Compose BOM**: `2026.09.00` resolves Compose 1.12.x with `minCompileSdk 37`, unreleased — versions resolve per-artifact POMs at the M3 1.4.0 era instead), `compileSdk 36` (`targetSdk 36`, `minSdk 26`), `buildFeatures.compose=true` + `buildConfig=true`, `android.useAndroidX=true`.
-- **Expressive Theme & Physics Motion**: Compose M3 `1.4.0` introduces `MaterialExpressiveTheme` and spring-based `MotionScheme.expressive()` (natural bounce/overshoot physics inherited by all M3 components, replacing static duration/easing curves):
+- **Expressive is BLOCKED until SDK 37 + M3 1.5.0 stable**: `MaterialExpressiveTheme`, `MotionScheme.expressive()`, `expressiveLightColorScheme()` and the opt-in annotation are `internal` in 1.4.0 (verified against the published `-sources.jar`, Oct 2026) and go public in 1.5.0 — whose artifacts demand the unreleased SDK 37 (`minCompileSdk 37`, no `android-37` platform upstream). So `KikitaiTheme` is classic `MaterialTheme` + dynamic color for now; the expressive body is spelled out in a comment in `ui/theme/Theme.kt` for the switch-over. Do NOT re-add `ExperimentalMaterial3ExpressiveApi` usages or the Compose BOM until then.
   ```kotlin
   import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
   import androidx.compose.material3.MaterialExpressiveTheme
