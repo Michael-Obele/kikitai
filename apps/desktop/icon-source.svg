@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Kikitai — paste and listen</title>
+  <rect width="1024" height="1024" rx="232" fill="#5b21b6"/>
+  <g fill="#ffffff">
+    <rect x="302" y="382" width="72" height="260" rx="36"/>
+    <rect x="412" y="302" width="72" height="420" rx="36"/>
+    <rect x="522" y="382" width="72" height="260" rx="36"/>
+    <rect x="632" y="452" width="72" height="120" rx="36"/>
+  </g>
+  <circle cx="512" cy="512" r="470" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="28"/>
+</svg>

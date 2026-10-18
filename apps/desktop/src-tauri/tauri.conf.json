@@ -1,7 +1,7 @@
 {
 	"$schema": "https://schema.tauri.app/config/2",
 	"productName": "Kikitai Read",
-	"version": "0.0.1",
+	"version": "0.1.1",
 	"identifier": "me.svelteapps.kikitai.read",
 	"build": {
 		"devUrl": "http://localhost:5174",
@@ -17,5 +17,17 @@
 				"Cross-Origin-Embedder-Policy": "credentialless"
 			}
 		}
+	},
+	"bundle": {
+		"active": true,
+		"category": "Utility",
+		"shortDescription": "Paste any text and hear it read aloud",
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
 	}
 }
