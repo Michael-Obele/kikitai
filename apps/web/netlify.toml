@@ -1,17 +1,23 @@
 # Netlify build settings — read only by Netlify (local and Docker builds keep
 # using `bun run build`, which picks adapter-node; see the `target` note in
 # vite.config.ts).
+#
+# Monorepo note (Netlify recommended setup): Base directory = repo root (/),
+# Package directory = apps/web. The build command runs in BASE, and `publish`
+# is resolved relative to BASE — not relative to this file. So even though
+# this file lives in apps/web/, `publish` must be "apps/web/build" and the
+# command must target the workspace (root package.json has no `build` script).
 [build]
 # `bun.lock` (text) is not one of Netlify's auto-detected lockfiles
 # (it looks for bun.lockb / yarn.lock / pnpm-lock.yaml), so install explicitly.
-command = "bun install && bun run build"
-publish = "build"
+command = "bun install && bun --filter @kikitai/web build"
+publish = "apps/web/build"
 
 [build.environment]
 # Skip Netlify's default `npm install` — Bun owns this lockfile, and npm's
 # strict peer resolution can fail where `bun install` succeeds.
 NPM_FLAGS = "--version"
-# Same Bun line as the Dockerfile (`oven/bun:1.4-alpine`) and local `bun -v`.
-BUN_VERSION = "1.4.0"
+# Same Bun line as packageManager (`bun@1.4.3`) and Dockerfile (`oven/bun:1.4-alpine`).
+BUN_VERSION = "1.4.3"
 # Netlify's default is already 24 — pinned so a build-image bump can't move it.
 NODE_VERSION = "24"
