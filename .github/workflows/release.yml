@@ -7,8 +7,9 @@
 # | `feat(scope)!: …` / `BREAKING CHANGE:`  | major  `0.0.1 → 1.0.0`  | `feat(contracts)!: rename spokenText`|
 # | `chore|docs|ci|test|refactor|style: …`  | no release              | `docs: webgpu matrix`                |
 #
-# The scope selects the package: contracts|web|mobile|desktop.
-# Unscoped feat:/fix: releases every package — avoid unless truly cross-shell.
+# The scope selects the changelog section, NOT the package: release-please
+# releases whichever packages have touched paths in the commits.
+# Unscoped feat:/fix: touching one package releases just that package.
 # Full rules: docs/release.md. Android is versioned by hand (see that doc).
 name: release
 on:

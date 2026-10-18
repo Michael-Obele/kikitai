@@ -19,10 +19,11 @@ _Allow GitHub Actions to create and approve pull requests_ setting
 | `feat(scope)!: …` or `BREAKING CHANGE:` footer | **major** `0.0.1 → 1.0.0`       | `feat(contracts)!: rename spokenText`  |
 | `chore                                         | docs                            | ci                                     | test | refactor | style(scope): …` | **no release** | `docs: webgpu matrix` |
 
-The **scope** selects the package: `contracts`, `web`, `mobile`, `desktop`
-(e.g. `feat(mobile): …` releases only `@kikitai/mobile`). Unscoped `feat:` /
-`fix:` apply to every configured package — avoid unless the change truly spans
-all shells. Scopes outside the four packages release nothing.
+The **scope** is cosmetic (changelog grouping only). What decides _which_
+packages release is **which package paths the commits touched**
+(`packages/contracts/**`, `apps/web/**`, …) — e.g. a workflow fix that also
+reformats every `CHANGELOG.md` releases everything, as happened with 0.1.1.
+Keep commits path-disciplined if you want a single-package release.
 
 ## Android (`apps/android-native`)
 
@@ -38,6 +39,5 @@ Gradle has no `package.json`, so release-please does not version it. Rule:
 
 ## First release
 
-Manifest versions all read `0.0.1`. The first `feat:`/`fix:` merged to `main`
-opens the inaugural release PRs; until then `release.yml` is a no-op that
-still validates on every push.
+Done — `contracts/web/mobile/desktop-v0.1.0` tags exist. `release.yml` stays
+green on every push and opens a PR whenever a releasable commit lands.
