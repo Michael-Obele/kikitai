@@ -26,6 +26,9 @@ jobs:
     outputs:
       release-id: ${{ steps.create.outputs.release-id }}
     steps:
+      # `gh release` shells out to git for repo context — needs a checkout.
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
       - if: startsWith(github.ref, 'refs/tags/')
         id: create
         run: |
