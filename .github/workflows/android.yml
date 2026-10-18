@@ -19,8 +19,9 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           # Default `packages` includes the long-removed `tools` package,
-          # which fails the step — pin exactly what AGP 8.6 + compileSdk 36 need.
-          packages: platform-tools "platforms;android-36" "build-tools;36.0.0"
+          # which fails the step — pin exactly what AGP 8.6 + compileSdk 36 need
+          # (no quotes: the action passes each token straight to sdkmanager).
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.10.2' }
       - run: gradle -p apps/android-native assembleDebug --console=plain

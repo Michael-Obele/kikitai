@@ -5,6 +5,11 @@ Releases are automated with **release-please** (`.github/workflows/release.yml`,
 and opens one release PR per package; merging it tags and creates the GitHub
 release. No manual version edits — never hand-bump `version` in a feature PR.
 
+Release-please opens PRs with `GITHUB_TOKEN`, which needs the repo's
+_Allow GitHub Actions to create and approve pull requests_ setting
+(readback + enable via
+`gh api repos/<owner>/<repo>/actions/permissions/workflow`).
+
 ## Commit message → version (also written in `release.yml`)
 
 | Commit message                                 | `packages/contracts` / `apps/*` | Example                                |
