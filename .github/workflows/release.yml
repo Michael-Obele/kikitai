@@ -1,0 +1,27 @@
+# Commit message → version (release-please, conventional commits).
+#
+# | Commit message                          | Version bump            | Example                              |
+# | --------------------------------------- | ----------------------- | ------------------------------------ |
+# | `fix(scope): …`                         | patch  `0.0.1 → 0.0.2`  | `fix(mobile): retry import`          |
+# | `feat(scope): …`                        | minor  `0.0.1 → 0.1.0`  | `feat(desktop): file-open for .txt`  |
+# | `feat(scope)!: …` / `BREAKING CHANGE:`  | major  `0.0.1 → 1.0.0`  | `feat(contracts)!: rename spokenText`|
+# | `chore|docs|ci|test|refactor|style: …`  | no release              | `docs: webgpu matrix`                |
+#
+# The scope selects the package: contracts|web|mobile|desktop.
+# Unscoped feat:/fix: releases every package — avoid unless truly cross-shell.
+# Full rules: docs/release.md. Android is versioned by hand (see that doc).
+name: release
+on:
+  push:
+    branches: ['main']
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .release-please-manifest.json

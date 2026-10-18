@@ -1,0 +1,17 @@
+name: contracts
+on:
+  push:
+    paths: ['packages/contracts/**', '.github/workflows/contracts.yml']
+  pull_request:
+    paths: ['packages/contracts/**']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.4.3' }
+      - run: bun install
+      - run: bunx vp fmt ./packages/contracts --check
+      - run: bun --filter '@kikitai/contracts' check
+      - run: bun test packages/contracts/tests/contracts.test.ts

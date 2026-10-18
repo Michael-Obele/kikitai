@@ -1,0 +1,21 @@
+name: desktop
+on:
+  push:
+    paths: ['apps/desktop/**', 'packages/contracts/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['apps/desktop/**']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.4.3' }
+      - run: bun install
+      - run: bunx vp fmt ./apps/desktop --check
+      - run: bunx prettier --check 'apps/desktop/**/*.svelte'
+      - run: bun --filter '@kikitai/desktop' check
+      # Static frontend build (adapter-static → build/, consumed as
+      # frontendDist by src-tauri/). `tauri build` (Rust + WebKit/WebView2
+      # toolchains) runs on release tags, not here.
+      - run: bun --filter '@kikitai/desktop' build
