@@ -7,7 +7,7 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 
 ## 1. Stack & `MaterialExpressiveTheme` (`material3:1.4.0`)
 
-- **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), AGP `9.1.0` + Gradle `9.3.1` + JDK 17 (AGP 9 ships built-in Kotlin — do NOT apply `org.jetbrains.kotlin.android`), Compose BOM `2026.09.00`, `androidx.compose.material3:material3:1.4.0` (+ `material3-window-size-class`, `material3-adaptive-navigation-suite`), `compileSdk 37` (`targetSdk 37`, `minSdk 26`), `buildFeatures.compose=true` + `buildConfig=true`, `android.useAndroidX=true`.
+- **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), AGP `9.1.0` + Gradle `9.3.1` + JDK 17 (AGP 9 ships built-in Kotlin — do NOT apply `org.jetbrains.kotlin.android`), `material3:1.4.0` + `material3-window-size-class:1.4.0` + `material3-adaptive-navigation-suite:1.4.0` (**no Compose BOM**: `2026.09.00` resolves Compose 1.12.x with `minCompileSdk 37`, unreleased — versions resolve per-artifact POMs at the M3 1.4.0 era instead), `compileSdk 36` (`targetSdk 36`, `minSdk 26`), `buildFeatures.compose=true` + `buildConfig=true`, `android.useAndroidX=true`.
 - **Expressive Theme & Physics Motion**: Compose M3 `1.4.0` introduces `MaterialExpressiveTheme` and spring-based `MotionScheme.expressive()` (natural bounce/overshoot physics inherited by all M3 components, replacing static duration/easing curves):
   ```kotlin
   import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi

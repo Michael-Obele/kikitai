@@ -8,13 +8,14 @@ plugins {
 
 android {
 	namespace = "me.svelteapps.kikitai"
-	// BOM 2026.09.00 artifacts (Compose 1.12.x, M3 1.5.0-beta01 chain) require
-	// compiling against API 37+.
-	compileSdk = 37
+	// Latest public platform is android-36 (SDK 37 unreleased): every artifact
+	// below targets ≤36. Do NOT re-add the Compose BOM until its artifacts stop
+	// demanding SDK 37 (check aar-metadata.properties `minCompileSdk` first).
+	compileSdk = 36
 	defaultConfig {
 		applicationId = "me.svelteapps.kikitai"
 		minSdk = 26
-		targetSdk = 37
+		targetSdk = 36
 		versionCode = 1
 		versionName = "0.0.1"
 	}
@@ -34,10 +35,11 @@ android {
 }
 
 dependencies {
-	implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+	// No Compose BOM: 2026.09.00 resolves Compose 1.12.x (minCompileSdk 37,
+	// unreleased). Versions below resolve per-artifact POMs at the M3 1.4.0 era.
 	implementation("androidx.compose.material3:material3:1.4.0")
 	implementation("androidx.compose.material3:material3-window-size-class:1.4.0")
-	implementation("androidx.compose.material3:material3-adaptive-navigation-suite:1.5.0-beta01")
+	implementation("androidx.compose.material3:material3-adaptive-navigation-suite:1.4.0")
 	implementation("androidx.core:core-ktx:1.17.0")
 	implementation("androidx.activity:activity-compose:1.13.0")
 	implementation("androidx.datastore:datastore-preferences:1.1.7")
