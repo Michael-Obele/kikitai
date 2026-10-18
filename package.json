@@ -9,7 +9,8 @@
 		"dev": "vp dev",
 		"lint": "vp check",
 		"format": "vp fmt . --write && prettier --write \"**/*.svelte\"",
-		"format:check": "vp fmt . --check && prettier --check \"**/*.svelte\""
+		"format:check": "vp fmt . --check && prettier --check \"**/*.svelte\"",
+		"prepare": "vp config --no-agent"
 	},
 	"devDependencies": {
 		"prettier": "^3.8.3",

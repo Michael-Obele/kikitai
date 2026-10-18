@@ -22,6 +22,16 @@ export default defineConfig({
 		trailingComma: 'none'
 	},
 
+	// Pre-commit: `vp staged` (lint-staged 17) runs these against staged files
+	// and re-stages fixes. Oxfmt ignores .svelte, Prettier owns it — the two
+	// patterns are disjoint on purpose. Hook script: `.vite-hooks/pre-commit`
+	// (committed); dispatcher lives in `.vite-hooks/_` (generated, ignored).
+	// Typecheck stays in CI — hooks stay fast (format only).
+	staged: {
+		'**/*.{js,mjs,cjs,mts,cts,ts,json,jsonc,md,mdx,toml,yml,yaml,css}': 'vp fmt --write',
+		'**/*.svelte': 'prettier --write'
+	},
+
 	lint: {
 		ignorePatterns: ['**/build/**', '**/.svelte-kit/**', '**/dist/**', '**/node_modules/**'],
 		plugins: ['typescript'],
