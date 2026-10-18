@@ -19,17 +19,18 @@ export default defineConfig({
 		singleQuote: true,
 		useTabs: true,
 		printWidth: 100,
-		trailingComma: 'none'
+		trailingComma: 'none',
+		// Svelte via the official prettier-svelte-plugin routed through Oxfmt
+		// (needs the `svelte` package installed). Lets us drop Prettier entirely.
+		svelte: true
 	},
 
 	// Pre-commit: `vp staged` (lint-staged 17) runs these against staged files
-	// and re-stages fixes. Oxfmt ignores .svelte, Prettier owns it — the two
-	// patterns are disjoint on purpose. Hook script: `.vite-hooks/pre-commit`
-	// (committed); dispatcher lives in `.vite-hooks/_` (generated, ignored).
+	// and re-stages fixes. One formatter for everything (Oxfmt routes `.svelte`
+	// through the official prettier-svelte-plugin via `fmt.svelte`).
 	// Typecheck stays in CI — hooks stay fast (format only).
 	staged: {
-		'**/*.{js,mjs,cjs,mts,cts,ts,json,jsonc,md,mdx,toml,yml,yaml,css}': 'vp fmt --write',
-		'**/*.svelte': 'prettier --write'
+		'**/*.{js,mjs,cjs,mts,cts,ts,json,jsonc,md,mdx,toml,yml,yaml,css,svelte}': 'vp fmt --write'
 	},
 
 	lint: {

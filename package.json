@@ -8,14 +8,11 @@
 	"scripts": {
 		"dev": "vp dev",
 		"lint": "vp check",
-		"format": "vp fmt . --write && prettier --write \"**/*.svelte\"",
-		"format:check": "vp fmt . --check && prettier --check \"**/*.svelte\"",
+		"format": "vp fmt . --write",
+		"format:check": "vp fmt . --check",
 		"prepare": "vp config --no-agent"
 	},
 	"devDependencies": {
-		"prettier": "^3.8.3",
-		"prettier-plugin-svelte": "^4.1.0",
-		"prettier-plugin-tailwindcss": "^0.8.0",
 		"typescript": "^6.0.3",
 		"vite-plus": "^1.3.0"
 	},

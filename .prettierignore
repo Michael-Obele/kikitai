@@ -1,3 +1,6 @@
+# Formatter ignore file — honored by `vp fmt` (Oxfmt).
+# (Historically Prettier's; Prettier is gone, the ignore role remains.)
+
 # Package Managers
 package-lock.json
 pnpm-lock.yaml

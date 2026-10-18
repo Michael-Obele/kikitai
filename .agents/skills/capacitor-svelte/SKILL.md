@@ -56,6 +56,6 @@ description: Capacitor 7 + SvelteKit thin-client pattern for Kikitai mobile. Use
 - **Dev isolation**: `vite.config.ts` `server.headers` carry COOP/COEP so multi-threaded ONNX WASM works in dev.
 - **Hybrid TTS Ladder**: ONNX WASM (`kitten` / `kokoro` via jsDelivr CDN) → native OS TTS fallback (`@capacitor-community/text-to-speech` / Web Speech) → cloud opt-in (`/api/app/v1/tts/synthesize`). Probe `SharedArrayBuffer` → `navigator.gpu` (try/catch) → native; skip the WebGPU probe on iOS. Full matrix: `docs/hybrid-tts-matrix.md`.
 - **Forms**: plain `onsubmit` + `fetch` to `/api/app/v1/*` is the pattern — SvelteKit remote functions (`query`/`form`/`command`) and `use:enhance` need the app's _own_ server, which a static shell has none of (docs: queries can't run under `adapter-static`). Keep the `pending`/`disabled`/`aria-busy` treatment on submit buttons.
-- **Toolchain**: `vp fmt` owns formatting (Oxfmt ignores `.svelte`); Prettier keeps `.svelte` only. Root: `bun run format` / `bun run format:check`.
+- **Toolchain**: `vp fmt` owns ALL formatting, including `.svelte` (Oxfmt routes it through the official prettier-svelte-plugin via `fmt.svelte` — no Prettier install anywhere). Root: `bun run format` / `bun run format:check`.
 
 Primary sources: `capacitorjs.com/solution/svelte`, `capawesome.io/blog/how-to-use-better-auth-in-capacitor-apps`, `better-auth.com/docs/plugins/bearer`, `svelte.dev/docs/kit/adapter-static`.

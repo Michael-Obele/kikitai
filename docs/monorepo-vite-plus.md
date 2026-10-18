@@ -187,3 +187,45 @@ In GitHub Actions (`T8`), `voidzero-dev/setup-vp` replaces manual Node, Bun, and
 1. **Pin an exact version or SHA** of `voidzero-dev/setup-vp` (never `@v1`, which is frozen).
 2. **`setup-vp` runs `vp install` automatically** and caches package-manager data when `cache: true`.
 3. **Vite Task Cache**: `node_modules/.vite/task-cache` can be restored after `setup-vp` using `actions/cache/restore@v6` and saved with `actions/cache/save@v6` using a rolling key (`vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}`).
+
+---
+
+## 6. Commit Hooks (`vp staged`, no husky)
+
+Formatting is enforced at commit time, not just in CI. Root `vite.config.ts`
+carries a `staged` block (lint-staged 17 semantics — matched staged files are
+passed to the command and fixes re-staged automatically):
+
+```ts
+staged: {
+	'**/*.{js,mjs,cjs,mts,cts,ts,json,jsonc,md,mdx,toml,yml,yaml,css,svelte}': 'vp fmt --write'
+}
+```
+
+One formatter for everything: Oxfmt routes `.svelte` through the official
+prettier-svelte-plugin (enabled via `fmt.svelte` in the root config, needs
+the `svelte` package — already in every app). There is no Prettier install
+anywhere in the repo; `prettier.config.js` is deleted and `.prettierignore`
+survives only as the shared ignore file both tools historically read.
+
+Wiring (all committed except the generated dispatcher):
+
+| Piece                           | Path                                 | Committed?                   |
+| ------------------------------- | ------------------------------------ | ---------------------------- |
+| Project hook (`bunx vp staged`) | `.vite-hooks/pre-commit`             | yes                          |
+| Dispatcher + shims              | `.vite-hooks/_`                      | no (`.gitignore`, recreated) |
+| Auto-install on `bun install`   | root `prepare: vp config --no-agent` | yes (`package.json`)         |
+
+Useful commands: `vp hooks status` (what's active in this clone),
+`vp hooks disable` (opt out locally, survives reinstalls),
+`VP_GIT_HOOKS=0 git commit …` (skip once). Fresh clones get hooks from the
+next `bun install`; existing clones run `vp hooks enable` once.
+
+Runners are pinned to `ubuntu-24.04` (not `ubuntu-latest`, which migrates to
+Ubuntu 26) and actions to Node-24 majors (`actions/checkout@v6`,
+`actions/setup-java@v6`, `android-actions/setup-android@v4`,
+`gradle/actions/setup-gradle@v6`).
+
+1. **Pin an exact version or SHA** of `voidzero-dev/setup-vp` (never `@v1`, which is frozen).
+2. **`setup-vp` runs `vp install` automatically** and caches package-manager data when `cache: true`.
+3. **Vite Task Cache**: `node_modules/.vite/task-cache` can be restored after `setup-vp` using `actions/cache/restore@v6` and saved with `actions/cache/save@v6` using a rolling key (`vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}`).

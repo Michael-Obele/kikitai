@@ -56,7 +56,7 @@ export default defineConfig({
 - **Auth**: Open system browser (`@tauri-apps/plugin-opener`) → deep-link callback (`@tauri-apps/plugin-deep-link`) with Google `idToken` → `authClient.signIn.social({ provider: 'google', idToken: { token } })` → capture `set-auth-token` header → store Bearer token in OS Keychain. Never embed Gmail refresh tokens on desktop.
 - **Desktop `/read` UX**: Recreated for desktop (no `packages/ui`) — frameless custom titlebar, `Cmd/Ctrl+K` paste focus, keyboard shortcuts, window-state restore, `.txt`/`.md` file-open + drag-drop, offline ONNX model-cache indicator, and hybrid TTS (ONNX WASM via CDN + OS Web Speech fallback + cloud opt-in). Dark mode via `mode-watcher` + `src/theme.css` (same contract as web). Probe `SharedArrayBuffer` → `navigator.gpu` (try/catch) → native; never gate on OS strings (`docs/hybrid-tts-matrix.md`).
 - **Forms**: plain `onsubmit` + `fetch` to `/api/app/v1/*` — remote functions and `use:enhance` need the app's own server, which a static shell has none of.
-- **Toolchain**: `vp fmt` owns formatting (Oxfmt ignores `.svelte`); Prettier keeps `.svelte` only.
+- **Toolchain**: `vp fmt` owns ALL formatting, including `.svelte` (Oxfmt routes it through the official prettier-svelte-plugin via `fmt.svelte` — no Prettier install anywhere).
 - **MCP**: `tauri-docs` remote + `@hypothesi/tauri-mcp-server` stdio for screenshots/IPC/logs.
 
 Primary sources: `v2.tauri.app/start/frontend/sveltekit`, `v2.tauri.app/reference/config/#headers`, `better-auth.com/docs/plugins/bearer`.
