@@ -95,7 +95,7 @@ fun ReadScreen(
                                     is ImportResult.Ok -> {
                                         undoText = text
                                         text = r.page.text
-                                        status = "Imported “${r.page.title}”.”
+                                        status = "Imported ${r.page.title}."
                                     }
 
                                     ImportResult.Unauthorized -> status = "Session expired — sign in again."

@@ -41,7 +41,9 @@ dependencies {
 	implementation("androidx.datastore:datastore-preferences:1.1.7")
 	implementation("androidx.credentials:credentials:1.5.0")
 	implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+	// Google ID option + ID-token credential types (NOT bundled in the
+	// play-services-auth artifact, which only holds the provider bridge).
+	implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 	implementation("com.squareup.okhttp3:okhttp:4.12.0")
-	implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 }

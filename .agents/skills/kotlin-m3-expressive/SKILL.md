@@ -7,7 +7,7 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 
 ## 1. Stack & `MaterialExpressiveTheme` (`material3:1.4.0`)
 
-- **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), Compose BOM `2026.09.00`, `androidx.compose.material3:material3:1.4.0` (+ `material3-window-size-class`, `material3-adaptive-navigation-suite`).
+- **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), AGP `9.1.0` + Gradle `9.3.1` + JDK 17 (AGP 9 ships built-in Kotlin — do NOT apply `org.jetbrains.kotlin.android`), Compose BOM `2026.09.00`, `androidx.compose.material3:material3:1.4.0` (+ `material3-window-size-class`, `material3-adaptive-navigation-suite`), `compileSdk 36`, `buildFeatures.compose=true` + `buildConfig=true`, `android.useAndroidX=true`.
 - **Expressive Theme & Physics Motion**: Compose M3 `1.4.0` introduces `MaterialExpressiveTheme` and spring-based `MotionScheme.expressive()` (natural bounce/overshoot physics inherited by all M3 components, replacing static duration/easing curves):
   ```kotlin
   import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -40,7 +40,7 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 
 ## 2. Credential Manager → Better Auth `idToken` → Bearer
 
-- **Obtain Google ID Token**: Use `androidx.credentials.CredentialManager` + `GetGoogleIdOption.Builder().setServerClientId(WEB_GOOGLE_CLIENT_ID).build()` → `GoogleIdTokenCredential.createFrom(credential.data).idToken`.
+- **Obtain Google ID Token**: Use `androidx.credentials.CredentialManager` + `GetGoogleIdOption.Builder().setServerClientId(WEB_GOOGLE_CLIENT_ID).build()` → `GoogleIdTokenCredential.createFrom(credential.data).idToken`. Needs `androidx.credentials:credentials:1.5.0` + `credentials-play-services-auth:1.5.0` + `com.google.android.libraries.identity.googleid:googleid:1.2.1` — the googleid types are NOT in the play-services-auth artifact.
 - **Exchange with Better Auth** (implemented: `data/GoogleAuth.kt` + `data/SessionStore.kt`, wired in `MainActivity`):
   - `POST ${WEB_ORIGIN}/api/auth/sign-in/social` with body `{ "provider": "google", "idToken": { "token": idToken } }`.
   - Extract response header `set-auth-token`, persist in Jetpack `DataStore` (`SessionStore.save`), and attach `Authorization: Bearer <token>` on all `/api/app/v1/*` requests via the `ApiClient` bearer lambda.
@@ -49,7 +49,7 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 
 ## 3. v1 Scope: Flagship `/read` Screen & Hybrid TTS
 
-- **UI recreated in Compose** (no WebView reuse); `kotlinx.serialization` DTOs mirror `@kikitai/contracts`.
+- **UI recreated in Compose** (no WebView reuse); OkHttp + `org.json` DTOs mirror `@kikitai/contracts` (no serialization plugin).
 - **`/read` features**: Paste box + live word count, URL import (`POST /api/app/v1/import-url`) with Undo, M3 Expressive `ModalBottomSheet` for voice/speed (0.75–3×)/auto-ramp (+0.1×/2min)/sleep timer, typography prefs persisted in `DataStore` mirroring `kikitai.reader.prefs`, `LoadingIndicator` / `SplitButton` / `ToggleButton`, `autoSize` text, shared-element morph, and TalkBack semantics.
 - **Hybrid TTS**: Android `android.speech.tts.TextToSpeech` + ONNX WASM/runtime via CDN + cloud opt-in (`/api/app/v1/tts/synthesize`).
 
