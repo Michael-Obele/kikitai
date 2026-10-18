@@ -1,92 +1,101 @@
+![Kikitai: your inbox, read aloud](.github/assets/banner.svg)
+
 # Kikitai
 
-> **聞きたい** (ききたい, _kikitai_) — Japanese, **"I want to hear it."**
+[![Built with Vite+](https://img.shields.io/badge/built%20with-Vite%2B-6254FE?style=flat&logo=vite&logoColor=white)](https://viteplus.dev)
+[![Release](https://img.shields.io/github/v/release/Michael-Obele/kikitai)](https://github.com/Michael-Obele/kikitai/releases)
 
-A self-hosted, open-source AI email organizer that **reads your mail aloud**.
+> **聞きたい** (ききたい, _kikitai_) — Japanese for "I want to hear it."
 
-Connect Gmail → the AI categorizes, summarizes and prioritizes it → a local neural voice reads the digest
-in your browser. Open-source AI assistants all triage and summarize; none of them read your mail to you.
-Audio is the differentiator, and it costs **$0 forever** because synthesis runs on your device.
+I built Kikitai because my inbox kept growing and my time did not. Connect Gmail and it
+sorts, sums up, and reads your mail aloud in a voice that runs on your device and costs
+nothing.
 
-- **Read-only** — one restricted scope, `gmail.readonly`. Nothing in this codebase can send, delete,
-  modify or label mail. "Organizing" happens in this app's own database, never written back to Gmail.
-- **BYO-AI** — any OpenAI-compatible endpoint: OpenAI, Groq, OpenRouter, or a local Ollama / LM Studio.
-  It is one Settings value, not a code change.
-- **Local voices by default** — Kitten (~57MB) and Kokoro (~90MB) load once in the browser, then work
-  offline. Web Speech is the zero-download fallback. Google/MiniMax cloud voices are opt-in.
-- **A free local reader** — `/read` takes any pasted text and reads it aloud: speeds
-  0.75×–3×, an auto-ramp that adds 0.1× every two minutes up to your chosen cap, no account
-  needed. Text never leaves the device.
-- **Self-hosted** — `docker compose up`, or `bun run dev` for development.
+- **Read-only.** One Gmail scope, `gmail.readonly`. Nothing here can send, delete, or
+  relabel mail. Sorting lives in this app's own database, never written back to Gmail.
+- **Your AI, your choice.** Any OpenAI-compatible endpoint: OpenAI, Groq, OpenRouter, or a
+  local Ollama / LM Studio. It is one Settings value, not a code change.
+- **Voices that run on your device.** Kitten (~57MB) and Kokoro (~90MB) load once in the
+  browser, then work offline. Web Speech is the zero-download fallback.
+- **A free reader.** `/read` reads any pasted text aloud at 0.75x to 3x, with an auto-ramp
+  that climbs 0.1x every two minutes. Nothing is uploaded, no account needed.
+- **Self-hosted.** Docker Compose or Netlify, Postgres included.
 
-## Quick start (development)
+## Contents
 
-Prerequisites: [Bun](https://bun.sh) ≥ 1.4 and a Postgres database (a Neon project, or the local
-container below).
+- [Repository layout](#repository-layout)
+- [Quick start](#quick-start)
+- [Connect Gmail](#connect-gmail)
+- [AI endpoint](#ai-endpoint)
+- [Voices](#voices)
+- [Self-host](#self-host)
+- [Environment variables](#environment-variables)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Repository layout
+
+A Bun workspaces monorepo. Vite+ by VoidZero (`vp` CLI) owns the toolchain: dev server,
+lint, format, and cached task runs from one root config.
+
+| Path                  | What it is                                                 |
+| --------------------- | ---------------------------------------------------------- |
+| `apps/web`            | The app. SvelteKit + Postgres + Better Auth + Gmail + TTS. |
+| `apps/mobile`         | Same app as an installable mobile app (Capacitor 7).       |
+| `apps/desktop`        | Same app as a desktop app (Tauri v2).                      |
+| `apps/android-native` | Thin native Android client (Kotlin + Compose).             |
+| `packages/contracts`  | Valibot DTOs shared by the web app and every client.       |
+
+Each package has its own README with setup notes. Start with `apps/web`.
+
+## Quick start
+
+You need [Bun](https://bun.sh) 1.4.3 and Node 24 (Vite+ runs on Node). Postgres can be
+the Docker container below, or a hosted project.
 
 ```sh
-bun install                 # installs dependencies
-cp .env.example .env        # then fill in DATABASE_URL (+ Google/AI values, see below)
-bun run db:push             # creates the tables (Drizzle schema)
-bun run dev                 # http://localhost:5173
+bun install
+cp apps/web/.env.example apps/web/.env  # then fill in DATABASE_URL and the values below
+bun --filter @kikitai/web db:push        # creates the tables (Drizzle schema)
+bun run dev                              # serves apps/web at http://localhost:5173
 ```
 
-> `ORIGIN` in `.env` must match the origin you actually serve on — the dev server prints it, and
-> Better Auth builds the Google callback URL from it.
+`ORIGIN` in `apps/web/.env` must match the URL you open. Better Auth builds the Google
+callback URL from it.
 
-Scripts:
+Commands run from the repo root unless a package README says otherwise:
 
-| Command             | What it does                                                           |
-| ------------------- | ---------------------------------------------------------------------- |
-| `bun run dev`       | dev server                                                             |
-| `bun run check`     | `svelte-kit sync` + `svelte-check` (types)                             |
-| `bun run format`    | Prettier write                                                         |
-| `bun run db:push`   | push the Drizzle schema to `DATABASE_URL`                              |
-| `bun run db:studio` | Drizzle Studio (browse tables)                                         |
-| `bun run build`     | production build → `build/` (adapter-node; adapter-netlify on Netlify) |
+| Command           | What it does                                     |
+| ----------------- | ------------------------------------------------ |
+| `bun run dev`     | dev server for `apps/web`                        |
+| `bun run lint`    | lint the repo (`vp check`)                       |
+| `bun run format`  | format everything (`vp fmt --write`)             |
+| `vp run -r build` | build every package in dependency order (cached) |
+| `vp cache clean`  | clear the Vite Task cache                        |
 
-Prefer a local database instead of Neon?
+## Connect Gmail
 
-```sh
-bun run db:start   # docker compose up db
-```
+`gmail.readonly` is a restricted scope. A client in Testing mode that only you authorize
+needs no Google verification at all, which is why self-hosting ships first.
 
-## Google OAuth — your own client (5 minutes)
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project.
+2. **OAuth consent screen:** user type External, add
+   `https://www.googleapis.com/auth/gmail.readonly`, stay in Testing, add your Gmail
+   address under Test users.
+3. **Credentials:** create an OAuth client ID (Web application) with redirect URI
+   `http://localhost:5173/api/auth/callback/google`. Copy the ID and secret.
+4. Enable the Gmail API under **APIs & Services → Library**.
+5. Put both values in `apps/web/.env` and sign in with Google, then press
+   **Connect Gmail** on the Inbox page.
 
-`gmail.readonly` is a **restricted** scope. A public deployment would need Google verification + a CASA
-security assessment, but a client in _Testing_ mode that only you authorize needs **no verification at
-all** — that is why self-hosting ships first.
-
-1. Open [Google Cloud Console](https://console.cloud.google.com/) → create a project (any name).
-2. **APIs & Services → OAuth consent screen**
-   - User type: **External** → fill the app name and your email.
-   - Scopes: add **`https://www.googleapis.com/auth/gmail.readonly`** (plus the automatic
-     `email`/`profile`).
-   - Save it while still in **Testing**. Add your Gmail address under **Test users**.
-3. **APIs & Services → Credentials → Create credentials → OAuth client ID**
-   - Application type: **Web application**.
-   - Authorized redirect URI: `http://localhost:5173/api/auth/callback/google`
-     (use your real origin in production, e.g. `https://mail.example.com/api/auth/callback/google`).
-   - Copy the **client ID** and **client secret**.
-4. Enable the Gmail API: **APIs & Services → Library → Gmail API → Enable**.
-5. Put both values in `.env`:
-
-```env
-GOOGLE_CLIENT_ID="…apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET="…"
-ORIGIN="http://localhost:5173"     # must match the redirect URI origin
-```
-
-Sign in with Google (it asks for consent — that is what mints the refresh token), then press
-**Connect Gmail** on the Inbox page. Tokens are encrypted at rest with `AUTH_TOKEN_SECRET`.
-
-Sign-in is **Google-only** — email/password is deliberately disabled server-side, so a deployment
-you accidentally leave reachable can't be signed up on; only the test users you listed on the consent
-screen can get in.
+The full walkthrough lives in [`docs/google-oauth.md`](docs/google-oauth.md). Tokens are
+encrypted at rest with `AUTH_TOKEN_SECRET`. Sign-in is Google-only on purpose: with no
+password signup, a deployment you leave reachable still only admits your test users.
 
 ## AI endpoint
 
-Settings → **AI endpoint**. Any OpenAI-compatible `base URL` + `model` (+ key, unless it is local):
+Settings → **AI endpoint**. Any OpenAI-compatible base URL + model (+ key, unless local):
 
 | Provider   | Base URL                         | Model example             |
 | ---------- | -------------------------------- | ------------------------- |
@@ -95,133 +104,114 @@ Settings → **AI endpoint**. Any OpenAI-compatible `base URL` + `model` (+ key,
 | OpenRouter | `https://openrouter.ai/api/v1`   | `openai/gpt-4o-mini`      |
 | Ollama     | `http://localhost:11434/v1`      | `llama3.2`                |
 
-Defaults can be baked into `.env` (`AI_BASE_URL`, `AI_KEY`, `AI_MODEL`); per-user Settings override
-them. The key is stored encrypted and only ever sent to the base URL you configured. Failures are
-non-fatal: the inbox still renders raw, and each message gets a **Re-organize** button.
+Defaults can be baked into `apps/web/.env` (`AI_BASE_URL`, `AI_KEY`, `AI_MODEL`).
+Per-user Settings override them. The key is stored encrypted and only ever sent to the
+base URL you configured. Failures are non-fatal: the inbox still renders raw, and each
+message gets a **Re-organize** button.
 
 ## Voices
 
-| Engine      | Download | Runs where      | Notes                               |
-| ----------- | -------- | --------------- | ----------------------------------- |
-| `kitten`    | ~57MB    | in your browser | default, Apache-2.0, 8 voices       |
-| `kokoro`    | ~90MB    | in your browser | hi-fi option, WebGPU when available |
-| `webspeech` | 0MB      | OS voices       | instant fallback                    |
-| `google`    | 0MB      | Google servers  | opt-in, needs `GOOGLE_TTS_KEY`      |
-| `minimax`   | 0MB      | MiniMax servers | opt-in, needs `MINIMAX_*`           |
+| Engine      | Download | Runs where   | Notes                           |
+| ----------- | -------- | ------------ | ------------------------------- |
+| `kitten`    | ~57MB    | your browser | default, Apache-2.0, 8 voices   |
+| `kokoro`    | ~90MB    | your browser | hi-fi option, WebGPU if present |
+| `webspeech` | 0MB      | OS voices    | instant fallback                |
+| `google`    | 0MB      | Google       | opt-in, needs `GOOGLE_TTS_KEY`  |
+| `minimax`   | 0MB      | MiniMax      | opt-in, needs `MINIMAX_*`       |
 
-The local engines are lazy-loaded from `PUBLIC_TTS_CDN` (default
-`https://cdn.jsdelivr.net/npm`, addressed as `<base>/<pkg>/+esm`) the first time you press Play, with
-an explicit _"downloads ~57MB once"_ notice — the ONNX runtimes are **not** bundled as npm
-dependencies (that would be ~450MB on disk). The base must be jsDelivr-style: esm.sh injects a Node
-`process` shim, which makes the loaders take their Node path and fail with
-`[unenv] fs.mkdirSync is not implemented yet!`. Point `PUBLIC_TTS_CDN` at your own mirror to run
-fully offline. Text for local engines never leaves the device.
+Local engines lazy-load from `PUBLIC_TTS_CDN` the first time you press Play, with an
+explicit "downloads ~57MB once" notice. Text for local engines never leaves the device.
+The tradeoffs are spelled out in [`docs/hybrid-tts-matrix.md`](docs/hybrid-tts-matrix.md).
 
-## Paste & read
+## Self-host
 
-`/read` is a standalone reader: paste an article, a chapter or a PDF page and press play. It
-runs entirely in the browser — **nothing is uploaded, no sign-in required** (sign in and it
-picks up your saved engine, voice and speed).
-
-| Control   | Values                                                     |
-| --------- | ---------------------------------------------------------- |
-| Speed     | 0.75× · 1× · 1.25× · 1.5× · 1.75× · 2× · 2.5× · 3×         |
-| Auto ramp | +0.1× every 2 minutes of playback, up to your chosen speed |
-
-## Self-host with Docker
+All deploy files live in `apps/web` (`compose.yaml`, `Dockerfile`, `netlify.toml`).
 
 ```sh
+cd apps/web
 cp .env.example .env       # set BETTER_AUTH_SECRET, AUTH_TOKEN_SECRET, Google + AI values
 docker compose up --build  # app on :3000, Postgres on :5432
 docker compose exec app bun run db:push
 ```
 
-The `app` image is built from the repo `Dockerfile` (bun build → adapter-node). Put Caddy/nginx with
-TLS in front of it in production, and set `ORIGIN` to the public URL.
+Put Caddy or nginx with TLS in front in production, and set `ORIGIN` to the public URL.
 
-## Deploy to Netlify
-
-The adapter is chosen from the environment in `vite.config.ts`: Netlify sets `NETLIFY=true` in its
-build, so a deploy from Git builds with `adapter-netlify`, while local builds and the Docker image
-keep `adapter-node`. Force one or the other with `KIT_ADAPTER=node` / `KIT_ADAPTER=netlify`.
-
-1. Import the repo as a Netlify site — `netlify.toml` already sets the build command
-   (`bun install && bun run build`) and the publish directory (`build`).
-2. Copy the variables from the table below into **Site configuration → Environment variables**.
-   `.env` is not committed, and `PUBLIC_*` values are baked in **at build time**, so set them before
-   the first deploy. `ORIGIN` must be the site URL (e.g. `https://<site>.netlify.app`) and the same
-   origin must be added to the Google OAuth client as `{ORIGIN}/api/auth/callback/google`.
-3. Deploy. SSR runs in a Netlify Function; static assets publish from `build/`.
-
-Things that behave differently on Netlify:
-
-- **Function timeout** — a synchronous Netlify Function dies after **10s** (raise it to 26s in
-  **Site configuration → Functions** on a paid plan). Slow AI calls (`Organize`, `Re-organize`) can
-  exceed that; the local Kitten/Kokoro voices are unaffected because synthesis runs in the browser.
-- **Database** — `DATABASE_URL` must be a hosted Postgres (Neon); the Docker Postgres on `:5432`
-  isn't reachable from Netlify. Run `bun run db:push` against it once.
-- **No local disk** — server-side caching lives in Postgres (`tts_audio`), not the filesystem, so
-  the read-only function filesystem is fine.
+On Netlify, the adapter is picked automatically (`adapter-netlify` on Netlify,
+`adapter-node` elsewhere). Set env vars in **Site configuration → Environment
+variables** before the first deploy, since `PUBLIC_*` values bake in at build time.
+Two limits to know: functions time out after 10s (26s on a paid plan), so slow AI calls
+can fail while browser voices keep working; and `DATABASE_URL` must be hosted Postgres,
+since the Docker database is not reachable from Netlify.
 
 ## Environment variables
 
-| Variable                               | Required        | Purpose                                                                                             |
-| -------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                         | yes             | Postgres connection string                                                                          |
-| `BETTER_AUTH_SECRET`                   | yes             | session signing (`openssl rand -base64 32`)                                                         |
-| `AUTH_TOKEN_SECRET`                    | yes             | encrypts OAuth tokens + the AI key at rest                                                          |
-| `ORIGIN`                               | yes             | canonical public origin; Better Auth dynamic baseURL fallback                                       |
-| `TRUSTED_ORIGINS`                      | for 2nd domain  | comma-separated extra origins (`https://<your-site>.netlify.app,https://<your-app>.svelte-apps.me`) |
-| `GOOGLE_CLIENT_ID`                     | for mail        | your OAuth client                                                                                   |
-| `GOOGLE_CLIENT_SECRET`                 | for mail        | your OAuth client                                                                                   |
-| `AI_BASE_URL` / `AI_KEY` / `AI_MODEL`  | no              | defaults for the Settings form                                                                      |
-| `TTS_ENGINE`                           | no              | `kitten` (default) \| `kokoro` \| `webspeech` \| `google` \| `minimax`                              |
-| `GOOGLE_TTS_KEY`                       | for cloud voice | Google Cloud text-to-speech                                                                         |
-| `MINIMAX_API_KEY` / `MINIMAX_GROUP_ID` | for cloud voice | MiniMax                                                                                             |
-| `PUBLIC_TTS_CDN`                       | no              | npm CDN base (`<base>/<pkg>/+esm`) for the local engines                                            |
+Values live in `apps/web/.env`. The Docker compose file reads the same names.
+
+| Variable                               | Required        | Purpose                                                                |
+| -------------------------------------- | --------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                         | yes             | Postgres connection string                                             |
+| `BETTER_AUTH_SECRET`                   | yes             | session signing (`openssl rand -base64 32`)                            |
+| `AUTH_TOKEN_SECRET`                    | yes             | encrypts OAuth tokens + the AI key at rest                             |
+| `ORIGIN`                               | yes             | canonical origin; builds the Google callback URL                       |
+| `TRUSTED_ORIGINS`                      | for 2nd domain  | comma-separated extra origins                                          |
+| `GOOGLE_CLIENT_ID`                     | for mail        | your OAuth client                                                      |
+| `GOOGLE_CLIENT_SECRET`                 | for mail        | your OAuth client                                                      |
+| `AI_BASE_URL` / `AI_KEY` / `AI_MODEL`  | no              | defaults for the Settings form                                         |
+| `TTS_ENGINE`                           | no              | `kitten` (default) \| `kokoro` \| `webspeech` \| `google` \| `minimax` |
+| `GOOGLE_TTS_KEY`                       | for cloud voice | Google Cloud text-to-speech                                            |
+| `MINIMAX_API_KEY` / `MINIMAX_GROUP_ID` | for cloud voice | MiniMax                                                                |
+| `PUBLIC_TTS_CDN`                       | no              | npm CDN base for the local engines                                     |
 
 ## Architecture
 
 ```
-src/
+apps/web/src/
   lib/
-    types/mail.ts            Valibot schemas shared by client + server (DTOs, filters, settings)
+    types/mail.ts     Valibot schemas shared by client + server (DTOs, filters, settings)
     server/
-      auth.ts                Better Auth (Google-only sign-in, Drizzle adapter)
-      db/                    Drizzle schema: auth tables, mail_account, message, settings
-      gmail.ts               Gmail REST client (list → get → parse to plain text)
-      ai.ts                  OpenAI-compatible client, strict JSON, one retry on parse failure
-      organize.ts            batch-classify pending messages
-      settings.ts            per-user settings, env fallbacks, encrypted key
-      tokens.ts              AES-256-GCM at rest
-    remote/                  SvelteKit remote functions (query / command / form)
-    tts/                     engine registry, lazy CDN loaders, playback
-    components/              ui/ (shadcn-svelte) + inbox, player, app shell
+      auth.ts         Better Auth (Google-only sign-in, Drizzle adapter)
+      db/             Drizzle schema: auth tables, mail_account, message, settings
+      gmail.ts        Gmail REST client (list, get, parse to plain text)
+      ai.ts           OpenAI-compatible client, strict JSON, one retry on parse failure
+      organize.ts     batch-classify pending messages
+      settings.ts     per-user settings, env fallbacks, encrypted key
+      tokens.ts       AES-256-GCM at rest
+    remote/           SvelteKit remote functions (query / command / form)
+    tts/              engine registry, lazy CDN loaders, playback
+    components/       ui/ (shadcn-svelte) + inbox, player, app shell
   routes/
-    +page.svelte             landing
-    login/                   sign in / sign up
-    (app)/dashboard/         inbox: sync, filters, categories, message view
-    (app)/digest/            listening order + play-all player
-    (app)/settings/          AI endpoint, voice, sync window
+    +page.svelte      landing
+    login/            sign in
+    (app)/dashboard/  inbox: sync, filters, categories, message view
+    (app)/digest/     listening order + play-all player
+    (app)/settings/   AI endpoint, voice, sync window
+packages/contracts/src/index.ts
+  mail, settings, importUrl DTOs every client imports
 ```
 
-- **Remote functions** (`kit.experimental.remoteFunctions` + `compilerOptions.experimental.async`):
-  `getInbox`/`getMessage`/`getDigest`/`getAccountStatus` (queries), `syncMail`/`organizeMail`/
-  `regenerateSummary`/`connectGmail`/`synthesize` (commands), `saveSettings` (form).
-- **Validation**: every remote argument and the AI's JSON response go through Valibot.
-- **Stack**: SvelteKit 2 + Svelte 5 runes, Tailwind CSS v4, shadcn-svelte, Drizzle ORM + Postgres,
-  Better Auth, Bun.
+Decisions are recorded in [`docs/adr`](docs/adr). Validation runs through Valibot on both
+sides: every remote-function argument and every AI JSON response. Stack: SvelteKit 2 +
+Svelte 5 runes, Tailwind CSS v4, shadcn-svelte, Drizzle ORM + Postgres, Better Auth, Bun,
+Vite+ task running and checks.
 
-## Security & privacy
+Security notes: the only Gmail scope is `gmail.readonly`, with no code path that sends
+or deletes mail. Message text only goes to the AI endpoint you configured; with a local
+model, nothing leaves. No telemetry in v1.
 
-- The only Gmail scope requested is `gmail.readonly`; there is no code path that sends, modifies or
-  deletes mail, and no Gmail label is ever written back.
-- OAuth tokens and the AI key are encrypted at rest (`AUTH_TOKEN_SECRET`); secrets never reach the
-  client. Message **text only** goes to your AI endpoint — with a local model, nothing leaves.
-- No telemetry in v1.
+## Contributing
+
+Issues and pull requests are welcome. Two things save a round trip: versions and
+changelogs are cut by release-please, so leave `CHANGELOG.md` files alone; and the
+pre-commit hook (`vp staged`) formats staged files, so CI only complains about real
+problems.
 
 ## Roadmap
 
-- [ ] Public launch → Google verification + CASA assessment
-- [ ] Draft replies, IMAP/Outlook, digest → MP3 export, non-English voices
+- [ ] Public launch: Google verification + CASA assessment
+- [ ] Draft replies, IMAP/Outlook, digest as MP3 export, non-English voices
 - [ ] Screenshots in this README once the OAuth walkthrough is exercised end-to-end
+
+## License
+
+There is no license file yet, so the code is not licensed for reuse. If you need one,
+open an issue and I will pick one.
