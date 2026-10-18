@@ -31,11 +31,22 @@ jobs:
         with: { fetch-depth: 0 }
       - if: startsWith(github.ref, 'refs/tags/')
         id: create
+        # Read-after-write on the releases API can 404 for seconds after a
+        # create — loop until the id resolves instead of emitting it empty
+        # (an empty release-id makes tauri-action fall back to tag lookup).
         run: |
           TAG="${{ github.ref_name }}"
-          gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --draft --title "Kikitai $TAG" --generate-notes
-          echo "release-id=$(gh api repos/${{ github.repository }}/releases/tags/$TAG --jq .id)" >> "$GITHUB_OUTPUT"
+          ID="$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true)"
+          tries=0
+          while [ -z "$ID" ] && [ "$tries" -lt 5 ]; do
+            gh release view "$TAG" >/dev/null 2>&1 || \
+              gh release create "$TAG" --draft --title "Kikitai $TAG" --generate-notes
+            sleep 10
+            ID="$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true)"
+            tries=$((tries + 1))
+          done
+          [ -n "$ID" ] || { echo "release $TAG never appeared"; exit 1; }
+          echo "release-id=$ID" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -79,7 +90,9 @@ jobs:
         with: { bun-version: '1.4.3' }
       - run: bun install
       - uses: actions/setup-java@v6
-        with: { distribution: 'temurin', java-version: '17' }
+        # Capacitor 7.6.x compiles with source/target 21 — JDK 17 fails with
+        # `invalid source release: 21`. (The native app stays on 17; untouched.)
+        with: { distribution: 'temurin', java-version: '21' }
       - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
