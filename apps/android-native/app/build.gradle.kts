@@ -1,6 +1,8 @@
 plugins {
 	id("com.android.application")
-	id("org.jetbrains.kotlin.android")
+	// AGP 9+ ships built-in Kotlin support: `org.jetbrains.kotlin.android` must
+	// NOT be applied (see https://kotl.in/gradle/agp-built-in-kotlin). The Compose
+	// compiler plugin below is still required.
 	id("org.jetbrains.kotlin.plugin.compose")
 }
 
