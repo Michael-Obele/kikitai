@@ -139,8 +139,18 @@ export const inboxFilterSchema = v.object({
 	category: v.optional(v.union([categorySchema, v.literal('all')])),
 	priority: v.optional(v.union([v.literal('all'), v.literal('high'), v.literal('unorganized')])),
 	search: v.optional(v.string()),
-	limit: v.optional(v.pipe(v.unknown(), v.transform((val) => (val !== undefined ? Number(val) : undefined)))),
-	offset: v.optional(v.pipe(v.unknown(), v.transform((val) => (val !== undefined ? Number(val) : undefined))))
+	limit: v.optional(
+		v.pipe(
+			v.unknown(),
+			v.transform((val) => (val !== undefined ? Number(val) : undefined))
+		)
+	),
+	offset: v.optional(
+		v.pipe(
+			v.unknown(),
+			v.transform((val) => (val !== undefined ? Number(val) : undefined))
+		)
+	)
 });
 export type InboxFilter = v.InferOutput<typeof inboxFilterSchema>;
 

@@ -7,11 +7,11 @@
 # The SvelteKit plugin already auto-detects `src/routes/**` as entry points, so
 # these are only the non-route roots (server hooks + anything loaded globally).
 entry = [
-    "src/hooks.server.ts",
-    "src/app.d.ts",
-    "src/routes/**/+layout.server.ts",
-    "src/routes/**/+page.server.ts",
-    "src/routes/**/+server.ts",
+	"src/hooks.server.ts",
+	"src/app.d.ts",
+	"src/routes/**/+layout.server.ts",
+	"src/routes/**/+page.server.ts",
+	"src/routes/**/+server.ts"
 ]
 
 # ---------------------------------------------------------------------------
@@ -37,9 +37,9 @@ entry = [
 ignoreExports = [{ file = "src/lib/components/ui/**", exports = ["*"] }]
 
 ignoreFindings = [
-    "src/lib/components/ui/**",
-    # SvelteKit `$lib` alias convention: placeholder file, nothing lives here yet.
-    "src/lib/index.ts",
+	"src/lib/components/ui/**",
+	# SvelteKit `$lib` alias convention: placeholder file, nothing lives here yet.
+	"src/lib/index.ts"
 ]
 
 [duplicates]

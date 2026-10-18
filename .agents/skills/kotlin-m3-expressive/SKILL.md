@@ -6,6 +6,7 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
 # Kotlin + Compose Material 3 Expressive (`apps/android-native`)
 
 ## 1. Stack & `MaterialExpressiveTheme` (`material3:1.4.0`)
+
 - **Versions**: Kotlin `2.4.10` (`org.jetbrains.kotlin.plugin.compose`), Compose BOM `2026.09.00`, `androidx.compose.material3:material3:1.4.0` (+ `material3-window-size-class`, `material3-adaptive-navigation-suite`).
 - **Expressive Theme & Physics Motion**: Compose M3 `1.4.0` introduces `MaterialExpressiveTheme` and spring-based `MotionScheme.expressive()` (natural bounce/overshoot physics inherited by all M3 components, replacing static duration/easing curves):
   ```kotlin
@@ -38,13 +39,16 @@ description: Native Android (Kotlin + Compose M3 Expressive) thin-client for Kik
   ```
 
 ## 2. Credential Manager → Better Auth `idToken` → Bearer
+
 - **Obtain Google ID Token**: Use `androidx.credentials.CredentialManager` + `GetGoogleIdOption.Builder().setServerClientId(WEB_GOOGLE_CLIENT_ID).build()` → `GoogleIdTokenCredential.createFrom(credential.data).idToken`.
-- **Exchange with Better Auth**:
+- **Exchange with Better Auth** (implemented: `data/GoogleAuth.kt` + `data/SessionStore.kt`, wired in `MainActivity`):
   - `POST ${WEB_ORIGIN}/api/auth/sign-in/social` with body `{ "provider": "google", "idToken": { "token": idToken } }`.
-  - Extract response header `set-auth-token`, persist in encrypted Jetpack `DataStore`, and attach `Authorization: Bearer <token>` on all `/api/app/v1/*` requests via Ktor/OkHttp interceptor.
-  - On HTTP `401` from `requireAppSession`, clear the stored token and surface sign-in. Never store or use Gmail tokens on-device.
+  - Extract response header `set-auth-token`, persist in Jetpack `DataStore` (`SessionStore.save`), and attach `Authorization: Bearer <token>` on all `/api/app/v1/*` requests via the `ApiClient` bearer lambda.
+  - `WEB_ORIGIN` + `GOOGLE_WEB_CLIENT_ID` arrive as `BuildConfig` fields from `KIKITAI_ORIGIN` / `GOOGLE_WEB_CLIENT_ID` env (empty compiles, sign-in explains at runtime). On HTTP `401` from `requireAppSession`, clear the stored token and surface sign-in. Never store or use Gmail tokens on-device.
+- **Dark mode**: free via `isSystemInDarkTheme()` + dynamic color in `KikitaiTheme` — no toggle needed (system setting is the idiom).
 
 ## 3. v1 Scope: Flagship `/read` Screen & Hybrid TTS
+
 - **UI recreated in Compose** (no WebView reuse); `kotlinx.serialization` DTOs mirror `@kikitai/contracts`.
 - **`/read` features**: Paste box + live word count, URL import (`POST /api/app/v1/import-url`) with Undo, M3 Expressive `ModalBottomSheet` for voice/speed (0.75–3×)/auto-ramp (+0.1×/2min)/sleep timer, typography prefs persisted in `DataStore` mirroring `kikitai.reader.prefs`, `LoadingIndicator` / `SplitButton` / `ToggleButton`, `autoSize` text, shared-element morph, and TalkBack semantics.
 - **Hybrid TTS**: Android `android.speech.tts.TextToSpeech` + ONNX WASM/runtime via CDN + cloud opt-in (`/api/app/v1/tts/synthesize`).

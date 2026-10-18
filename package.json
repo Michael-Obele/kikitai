@@ -1,7 +1,6 @@
 {
 	"name": "kikitai-monorepo",
 	"private": true,
-	"packageManager": "bun@1.4.3",
 	"workspaces": [
 		"apps/*",
 		"packages/*"
@@ -9,7 +8,8 @@
 	"scripts": {
 		"dev": "vp dev",
 		"lint": "vp check",
-		"format": "prettier --write ."
+		"format": "vp fmt . --write && prettier --write \"**/*.svelte\"",
+		"format:check": "vp fmt . --check && prettier --check \"**/*.svelte\""
 	},
 	"devDependencies": {
 		"prettier": "^3.8.3",
@@ -20,5 +20,6 @@
 	},
 	"overrides": {
 		"vite": "npm:@voidzero-dev/vite-plus-core@^1.3.0"
-	}
+	},
+	"packageManager": "bun@1.4.3"
 }

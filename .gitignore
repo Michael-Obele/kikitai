@@ -42,3 +42,4 @@ docs/plans/*
 lighthouse-report/
 **/tests/.guardrail-cookie
 .superpowers/*
+docs/superpowers/

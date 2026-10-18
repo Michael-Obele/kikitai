@@ -28,7 +28,8 @@ const importUrlSchema = v.object({
 
 /** What the reader gets back: the imported page, or a message they can act on. */
 export type ImportOutcome =
-	{ ok: true; title: string; text: string } | { ok: false; error: string };
+	| { ok: true; title: string; text: string }
+	| { ok: false; error: string };
 
 /**
  * Read a public web page on the server and return its text.
