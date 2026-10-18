@@ -17,8 +17,10 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '17' }
       - uses: android-actions/setup-android@v3
-      - run: yes | sdkmanager --licenses > /dev/null
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        with:
+          # Default `packages` includes the long-removed `tools` package,
+          # which fails the step — pin exactly what AGP 8.6 + compileSdk 36 need.
+          packages: platform-tools "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.10.2' }
       - run: gradle -p apps/android-native assembleDebug --console=plain
