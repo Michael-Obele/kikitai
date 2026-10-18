@@ -36,6 +36,9 @@ jobs:
           mv apps/android-native/app/build/outputs/apk/debug/app-debug.apk
           kikitai-read-${{ github.ref_name }}-debug.apk
       - uses: softprops/action-gh-release@v2
+        # Tags only: a manual dispatch proves the build without publishing
+        # (otherwise this would cut a junk release named after the branch).
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: kikitai-read-${{ github.ref_name }}-debug.apk
           body: |
