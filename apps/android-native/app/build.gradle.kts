@@ -8,11 +8,13 @@ plugins {
 
 android {
 	namespace = "me.svelteapps.kikitai"
-	compileSdk = 36
+	// BOM 2026.09.00 artifacts (Compose 1.12.x, M3 1.5.0-beta01 chain) require
+	// compiling against API 37+.
+	compileSdk = 37
 	defaultConfig {
 		applicationId = "me.svelteapps.kikitai"
 		minSdk = 26
-		targetSdk = 36
+		targetSdk = 37
 		versionCode = 1
 		versionName = "0.0.1"
 	}

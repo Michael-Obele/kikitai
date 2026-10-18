@@ -19,9 +19,9 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           # Default `packages` includes the long-removed `tools` package,
-          # which fails the step — pin exactly what AGP 8.6 + compileSdk 36 need
+          # which fails the step — pin exactly what AGP 9.1 + compileSdk 37 need
           # (no quotes: the action passes each token straight to sdkmanager).
-          packages: platform-tools platforms;android-36 build-tools;36.0.0
+          packages: platform-tools platforms;android-37 build-tools;37.0.0
       - uses: gradle/actions/setup-gradle@v4
         # AGP 9.x needs Gradle 9.x (BOM 2026.09.00 artifacts require AGP 9.1+,
         # which needs Gradle 9.3.1+).
