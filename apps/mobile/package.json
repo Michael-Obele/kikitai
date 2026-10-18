@@ -17,6 +17,7 @@
 		"better-auth": "^1.6.23"
 	},
 	"devDependencies": {
+		"@capacitor/android": "^7",
 		"@capacitor/cli": "^7.0.0",
 		"@sveltejs/adapter-static": "^3.0.0",
 		"@sveltejs/kit": "^2.63.0",
