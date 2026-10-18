@@ -6,9 +6,10 @@ on:
     paths: ['packages/contracts/**']
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned off `ubuntu-latest` (migrating to Ubuntu 26) for stable tooling.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: '1.4.3' }
       - run: bun install

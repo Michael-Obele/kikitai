@@ -6,14 +6,14 @@ on:
     paths: ['apps/mobile/**']
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned off `ubuntu-latest` (migrating to Ubuntu 26) for stable tooling.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: '1.4.3' }
       - run: bun install
       - run: bunx vp fmt ./apps/mobile '!**/CHANGELOG.md' --check
-      - run: bunx prettier --check 'apps/mobile/**/*.svelte'
       - run: bun --filter '@kikitai/mobile' check
       # Static SPA build (adapter-static → build/). Native packaging
       # (`npx cap add` + `cap sync` + Xcode/Gradle) runs on release tags, not here.

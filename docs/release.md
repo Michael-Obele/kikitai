@@ -34,6 +34,16 @@ Gradle has no `package.json`, so release-please does not version it. Rule:
 - Bump `versionCode` (+1) and `versionName` in `app/build.gradle.kts` in the
   same PR that ships user-facing android changes, with a
   `feat(android): …` message for the changelog record.
+- Cut the release: push tag `android-v<versionName>`
+  (e.g. `git tag android-v0.4.2 && git push origin android-v0.4.2`).
+  `.github/workflows/android-release.yml` assembles the **debug APK** and
+  attaches it as `kikitai-read-android-v<version>-debug.apk` on a GitHub
+  release of the same name — this is what shows up in the Release tab.
+  The workflow fails fast if the tag doesn't match `versionName`.
+- Debug APKs are SDK-signed and installable as-is — no secrets needed.
+  A Play-signed `release` APK needs `ANDROID_KEYSTORE_*` secrets first
+  (keystore upload + `signingConfigs`); deliberately not wired yet —
+  talk about it when distribution starts.
 - `KIKITAI_ORIGIN` / `GOOGLE_WEB_CLIENT_ID` for release builds come from
   GitHub Actions variables/secrets (see `android.yml`), never from source.
 
