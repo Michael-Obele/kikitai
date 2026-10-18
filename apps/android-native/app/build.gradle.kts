@@ -16,8 +16,10 @@ android {
 		applicationId = "me.svelteapps.kikitai"
 		minSdk = 26
 		targetSdk = 36
-		versionCode = 1
-		versionName = "0.0.1"
+		// Tracks the unified root version by hand (release-please only bumps
+		// package.json files). Bump alongside every user-facing android change.
+		versionCode = 2
+		versionName = "0.1.1"
 	}
 	buildFeatures {
 		compose = true
