@@ -3,15 +3,24 @@
 # vite.config.ts).
 #
 # Monorepo note (Netlify recommended setup): Base directory = repo root (/),
-# Package directory = apps/web. The build command runs in BASE, and `publish`
-# is resolved relative to BASE — not relative to this file. So even though
-# this file lives in apps/web/, `publish` must be "apps/web/build" and the
-# command must target the workspace (root package.json has no `build` script).
+# Package directory = apps/web. The build command runs in BASE, so it must
+# target the workspace (`bun --filter @kikitai/web build`).
+#
+# There is deliberately NO `publish` key here. One value cannot satisfy both
+# readers of this file:
+# - Netlify resolves `publish` relative to BASE (repo root).
+# - adapter-netlify reads this same file relative to its cwd (apps/web/,
+#   where `bun --filter` runs the build) and defaults to `build` when the
+#   key is absent — which lands exactly at apps/web/build.
+# So: keep `publish` out of this file and set Publish directory = apps/web/build
+# in the Netlify UI (Site configuration > Build & deploy > Continuous
+# deployment > Build settings). Verified against adapter-netlify 6.0.4
+# (`get_publish_directory` falls back to 'build') and
+# https://svelte.dev/docs/kit/adapter-netlify (publish defaults to `build`).
 [build]
 # `bun.lock` (text) is not one of Netlify's auto-detected lockfiles
 # (it looks for bun.lockb / yarn.lock / pnpm-lock.yaml), so install explicitly.
 command = "bun install && bun --filter @kikitai/web build"
-publish = "apps/web/build"
 
 [build.environment]
 # Skip Netlify's default `npm install` — Bun owns this lockfile, and npm's
