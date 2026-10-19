@@ -32,17 +32,22 @@ jobs:
       - if: startsWith(github.ref, 'refs/tags/')
         id: create
         # Read-after-write on the releases API can 404 for seconds after a
-        # create — loop until the id resolves instead of emitting it empty
-        # (an empty release-id makes tauri-action fall back to tag lookup).
+        # create — loop until a NUMERIC id resolves. (`gh api --jq` prints API
+        # errors to stdout, so accept digits only; anything else retries.)
+        # An empty release-id makes tauri-action fall back to tag lookup,
+        # which is exactly the failure this guards against.
         run: |
           TAG="${{ github.ref_name }}"
-          ID="$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true)"
+          lookup() { gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true; }
+          ID="$(lookup)"
+          case "$ID" in ''|*[!0-9]*) ID="";; esac
           tries=0
-          while [ -z "$ID" ] && [ "$tries" -lt 5 ]; do
+          while [ -z "$ID" ] && [ "$tries" -lt 6 ]; do
             gh release view "$TAG" >/dev/null 2>&1 || \
               gh release create "$TAG" --draft --title "Kikitai $TAG" --generate-notes
-            sleep 10
-            ID="$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true)"
+            sleep 15
+            ID="$(lookup)"
+            case "$ID" in ''|*[!0-9]*) ID="";; esac
             tries=$((tries + 1))
           done
           [ -n "$ID" ] || { echo "release $TAG never appeared"; exit 1; }
