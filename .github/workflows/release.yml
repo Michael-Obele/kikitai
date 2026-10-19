@@ -38,9 +38,11 @@ jobs:
         # which is exactly the failure this guards against.
         run: |
           TAG="${{ github.ref_name }}"
-          lookup() { gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>/dev/null || true; }
+          echo "repo=${{ github.repository }} tag=$TAG"
+          gh auth status 2>&1 | head -n 3
+          lookup() { gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq .id 2>&1 | tail -n 1; }
           ID="$(lookup)"
-          case "$ID" in ''|*[!0-9]*) ID="";; esac
+          case "$ID" in ''|*[!0-9]*) echo "lookup says: $ID"; ID="";; esac
           tries=0
           while [ -z "$ID" ] && [ "$tries" -lt 6 ]; do
             gh release view "$TAG" >/dev/null 2>&1 || \
