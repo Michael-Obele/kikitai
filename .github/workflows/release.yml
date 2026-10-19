@@ -154,6 +154,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      # `gh release` shells out to git for repo context — needs a checkout.
+      - uses: actions/checkout@v6
       - run: gh release edit "${{ github.ref_name }}" --draft=false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
